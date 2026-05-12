@@ -9,7 +9,7 @@ test:
     - pip install pytest
   stage: test
   variables:
-    GROQ_API_KEY: "test"
+    GROQ_API_KEY: "some-api-key"
   script:
     - pip install -e .
     - pytest

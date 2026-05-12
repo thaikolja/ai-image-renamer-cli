@@ -1,6 +1,6 @@
 # AI Image Renamer
 
-![PyPI - Version](https://img.shields.io/pypi/v/ai-image-renamer) ![PyPI - Downloads](https://img.shields.io/pypi/dm/ai-image-renamer) ![PyPI - License](https://img.shields.io/pypi/l/ai-image-renamer)
+![PyPI-Version](https://img.shields.io/pypi/v/ai-image-renamer) ![PyPI - Downloads](https://img.shields.io/pypi/dm/ai-image-renamer) ![PyPI - License](https://img.shields.io/pypi/l/ai-image-renamer)
 
 **AI Image Renamer CLI** is a command-line tool that uses generative AI to rename image files based on their content, giving your photo collection more descriptive and searchable filenames. A [**free** Groq API key](https://console.groq.com/keys) is required. **For full documentation, visit the [official docs](https://docs.kolja-nolte.com/ai-image-renamer-cli)**.
 

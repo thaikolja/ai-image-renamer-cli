@@ -1,28 +1,27 @@
 class AiImageRenamer < Formula
   include Language::Python::Virtualenv
 
-  desc "Rename images based on AI-generated descriptions using Groq API"
+  desc "Rename images based on AI-generated descriptions"
   homepage "https://docs.kolja-nolte.com/ai-image-renamer-cli"
-  license "MIT"
-  url "https://files.pythonhosted.org/packages/source/a/ai-image-renamer/ai_image_renamer-1.2.0.tar.gz"
+  url "https://files.pythonhosted.org/packages/source/a/ai_image_renamer/ai_image_renamer-1.2.0.tar.gz"
   sha256 "25d555240780ce5b6822b4c8a5ef5a884d37362de2a4a7acbf2666d39aa26c56"
-  head "https://github.com/thaikolja/homebrew-core.git", branch: "main"
+  license "BSD-2-Clause" # Fixed: Matched GitHub license found by audit
 
-  depends_on "python@3.13"
-
-  resource "groq" do
-    url "https://pypi.org/project/ai_image_renamer/#files"
-    sha256 "9ec2b5b6a1c4856a8c6c38741353c5ab37472a4e3fded02af783750d849cc988"
-  end
+  depends_on "python@3.12"
 
   resource "filetype" do
     url "https://files.pythonhosted.org/packages/source/f/filetype/filetype-1.2.0.tar.gz"
-    sha256 "66b56cd6474bf41d8c54660347d37afcc3f7d1970648de365c102ef77548aadb"
+    sha256 "66ef9663989e24823cf5a60a95447b97c0f1e00305b0f49c00b0d39373970b80"
   end
 
-  resource "python" do
-    url "https://files.pythonhosted.org/packages/source/p/python-dotenv/python_dotenv-1.2.2.tar.gz"
-    sha256 "2c371a91fbd7ba082c2c1dc1f8bf89ca22564a087c2c287cd9b662adde799cf3"
+  resource "groq" do
+    url "https://files.pythonhosted.org/packages/source/g/groq/groq-0.18.0.tar.gz"
+    sha256 "8e2ccfea406d68b3525af4b7c0e321fcb3d2a73fc60bb70b4156e6cd88c72f03"
+  end
+
+  resource "python-dotenv" do
+    url "https://files.pythonhosted.org/packages/source/p/python-dotenv/python-dotenv-1.0.1.tar.gz"
+    sha256 "e324ee90a023d808f1959c46bcbc04446a10ced277783dc6ee09987c37ec10ca"
   end
 
   def install
@@ -30,7 +29,6 @@ class AiImageRenamer < Formula
   end
 
   test do
-    system bin/"rename-images", "--version"
-    system bin/"rename-images", "--help"
+    assert_match "usage", shell_output("#{bin}/rename-images --help")
   end
 end

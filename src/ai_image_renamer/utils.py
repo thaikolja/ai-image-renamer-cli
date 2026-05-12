@@ -37,23 +37,22 @@ The functions in this module are designed to work together as a pipeline:
 
 # os: Provides filesystem path and file operations
 # Used for: path manipulation, file existence checks, environment variables
+# base64: Encoding binary data as ASCII strings
+# Used for: converting image bytes to base64 for API transmission
+import base64
+
 import os
 
 # re: Regular expression operations for text processing
 # Used for: sanitizing filenames, removing non-alphabetic characters
 import re
 
-# base64: Encoding binary data as ASCII strings
-# Used for: converting image bytes to base64 for API transmission
-import base64
-
-# json: Used to build the multimodal request payload without nested literal noise
-import json
+# time: Provides sleep for retry backoffs
+import time
 
 # ==============================================================================
 # Third-Party Library Imports
 # ==============================================================================
-
 # filetype: Infers file type from magic bytes (file header)
 # More reliable than file extensions for security and accuracy
 # Supports: JPEG, PNG, GIF, WebP, and many other formats
@@ -67,6 +66,7 @@ from groq import Groq
 # ==============================================================================
 # Image Validation Functions
 # ==============================================================================
+
 
 def verify_image_file(image_path: str) -> bool:
     """
@@ -119,7 +119,7 @@ def verify_image_file(image_path: str) -> bool:
 
     # Step 3: Validate that we got a result and it's an image type
     # mime_type.mime format: "image/jpeg", "image/png", "video/mp4", etc.
-    if not mime_type or not mime_type.mime.startswith('image/'):
+    if not mime_type or not mime_type.mime.startswith("image/"):
         return False
 
     # All validation checks passed - this is a valid image file
@@ -129,6 +129,7 @@ def verify_image_file(image_path: str) -> bool:
 # ==============================================================================
 # Image Encoding Functions
 # ==============================================================================
+
 
 def encode_image(image_path: str) -> str:
     """
@@ -172,12 +173,13 @@ def encode_image(image_path: str) -> str:
 
         # Encode binary data to base64 bytes, then decode to UTF-8 string
         # b64encode returns bytes; decode() converts to str for JSON compatibility
-        return base64.b64encode(binary_data).decode('utf-8')
+        return base64.b64encode(binary_data).decode("utf-8")
 
 
 # ==============================================================================
 # Path Sanitization Functions
 # ==============================================================================
+
 
 def sanitize_image_path(image_path: str, image_content: str) -> str:
     """
@@ -239,12 +241,12 @@ def sanitize_image_path(image_path: str, image_content: str) -> str:
     # Step 4: Remove all non-alphabetic characters (except spaces)
     # Regex [^a-z\s] matches anything NOT a-z or whitespace
     # Replace matched characters with a space to maintain word boundaries
-    clean_content = re.sub(r'[^a-z\s]+', ' ', lower_content)
+    clean_content = re.sub(r"[^a-z\s]+", " ", lower_content)
 
     # Step 5: Collapse whitespace sequences into single hyphens
     # \s+ matches one or more whitespace characters (space, tab, newline)
     # strip('-') removes leading/trailing hyphens from the result
-    slug = re.sub(r'\s+', '-', clean_content).strip('-')
+    slug = re.sub(r"\s+", "-", clean_content).strip("-")
 
     # Step 6: Construct the final path
     # os.path.join() handles path separator correctly across platforms
@@ -255,83 +257,45 @@ def _guess_image_mime_type(image_path: str) -> str:
     """Return the detected image MIME type, falling back to JPEG."""
 
     kind = filetype.guess(image_path)
-    if kind and kind.mime.startswith('image/'):
+    if kind and kind.mime.startswith("image/"):
         return kind.mime
 
-    return 'image/jpeg'
+    return "image/jpeg"
 
 
 # ==============================================================================
 # AI Content Generation Functions
 # ==============================================================================
 
+
+_RETRY_MAX = 3
+_RETRY_BACKOFF_BASE = 2.0
+_REQUEST_TIMEOUT = 30.0
+
+_MODEL_ID = "meta-llama/llama-4-scout-17b-16e-instruct"
+
+
 def get_words(image_path: str, words: int = 6) -> str:
     """
     Generate a concise, SEO-friendly description for an image using AI.
 
-    This function sends an image to Groq's multimodal API (Llama 4 Maverick model)
+    Sends an image to the Groq multimodal API (Llama 4 Scout) and receives
+    a short text description suitable for use as a filename.
 
-    and receives a short text description of the image contents. The description
-    is suitable for use as a filename.
-
-    The function uses the Groq API which provides:
-    - Extremely fast inference (milliseconds per request)
-    - Multimodal understanding (text + image input)
-    - Free tier available with API key
+    Includes automatic retry with exponential backoff for transient failures.
 
     Args:
-        image_path (str): Filesystem path to the image to analyze.
-                          Must point to a readable image file.
-                          Supports JPEG, PNG, WebP, GIF, and other common formats.
-        words (int, optional): Maximum number of words requested in the description.
-                               The model treats this as a soft constraint.
-                               Defaults to 6.
-                               Range: 1-50 (enforced by CLI, not this function).
+        image_path: Filesystem path to the image to analyze.
+        words: Maximum number of words requested in the description (1-50).
 
     Returns:
-        str: AI-generated description of the image contents.
-             Example: "sunset over calm ocean with orange sky"
-             Returns empty string '' if:
-             - GROQ_API_KEY environment variable is not set
-             - API returns empty response
-             - API returns None for any expected field
+        AI-generated description, or empty string on failure after retries.
 
     Raises:
         RuntimeError: If GROQ_API_KEY environment variable is not set.
-                     User must set this before calling the function.
-        FileNotFoundError: If image_path does not exist (propagated from encode_image).
-        Exception: Any underlying Groq client exception is not caught here.
-                  Network errors, API rate limits, etc. will propagate.
-
-    Environment Variables:
-        GROQ_API_KEY (str, required): Your Groq API key.
-            Get a free key at: https://console.groq.com/keys
-            Set via: export GROQ_API_KEY="gsk_..."
-
-    Example:
-        >>> # Set environment variable first
-        >>> os.environ["GROQ_API_KEY"] = "gsk_xxx"
-        >>> description = get_words("beach_photo.jpg", words=5)
-        >>> print(description)
-        'sunny beach with palm trees'
-
-    Technical Details:
-        - Model: meta-llama/llama-4-maverick-17b-128e-instruct
-        - Temperature: 2.0 (high creativity, varied outputs)
-        - Image encoding: Base64 data URL using the detected MIME type
-        - Request type: Chat completion with multimodal content
-
-    Note:
-        Temperature=2.0 encourages creative, varied descriptions.
-        Lower values (0.0-1.0) would produce more consistent outputs.
-        The model may occasionally exceed the requested word count.
+        FileNotFoundError: If image_path does not exist.
     """
-    # Step 1: Retrieve the API key from environment variables
-    # This must be set before calling the function
     groq_api_key = os.getenv("GROQ_API_KEY")
-
-    # Step 2: Validate API key exists
-    # Fail fast with clear error message if key is missing
     if not groq_api_key:
         raise RuntimeError(
             "GROQ_API_KEY environment variable is not set. "
@@ -339,78 +303,70 @@ def get_words(image_path: str, words: int = 6) -> str:
             "Get a free key at: https://console.groq.com/keys"
         )
 
-    # Step 3: Initialize the Groq client with the API key
-    # The client handles connection pooling and request formatting
-    client = Groq(api_key=groq_api_key)
-
-    # Step 4: Encode the image to base64 for API transmission
-    # This converts binary image data to a string format suitable for JSON
     encoded_image = encode_image(image_path)
     image_mime_type = _guess_image_mime_type(image_path)
 
-    # Step 5: Construct the multimodal chat completion request
-    # The message contains both text instructions and the image data
-    request_messages = json.loads(
-        f'''
-        [
-            {{
-                "role": "user",
-                "content": [
-                    {{
-                        "type": "text",
-                        "text": "What's in this image? Describe the content of this image with no more than {words} words in an SEO-friendly way"
-                    }},
-                    {{
-                        "type": "image_url",
-                        "image_url": {{
-                            "url": "data:{image_mime_type};base64,{encoded_image}"
-                        }}
-                    }}
-                ]
-            }}
-        ]
-        '''
-    )
+    word_label = "word" if words == 1 else "words"
+
+    request_messages = [
+        {
+            "role":    "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": (
+                        "What's in this image? Describe the content of this image "
+                        f"with no more than {words} {word_label} in an SEO-friendly way"
+                    ),
+                },
+                {
+                    "type":      "image_url",
+                    "image_url": {
+                        "url": f"data:{image_mime_type};base64,{encoded_image}"
+                    },
+                },
+            ],
+        }
+    ]
 
     request_payload = {
-        # Use Llama 4 Maverick: fast, multimodal, good for descriptive tasks
-        "model": "meta-llama/llama-4-maverick-17b-128e-instruct",
-
-        # Temperature controls randomness:
-        # 0.0 = deterministic, 1.0 = balanced, 2.0 = very creative
-        # Higher temperature produces more varied, creative descriptions
+        "model":       _MODEL_ID,
         "temperature": 2.0,
-
-        # Disable streaming - we want the complete response at once
-        "stream": False,
-
-        # No custom stop sequences - let the model complete naturally
-        "stop": None,
-
-        # Messages array: conversation history for the model
-        "messages": request_messages,
+        "stream":      False,
+        "stop":        None,
+        "messages":    request_messages,
     }
 
-    completion = client.chat.completions.create(**request_payload)
+    client = Groq(api_key=groq_api_key, timeout=_REQUEST_TIMEOUT)
+    last_exception = None
 
-    # Step 6: Extract the response content with defensive null checks
-    # The API response structure: completion.choices[0].message.content
+    for attempt in range(1, _RETRY_MAX + 1):
+        try:
+            completion = client.chat.completions.create(**request_payload)
 
-    # Check if we received any response at all
-    if not completion or not completion.choices:
-        return ''
+            if not completion or not completion.choices:
+                return ""
+            if not completion.choices[0].message:
+                return ""
+            if not completion.choices[0].message.content:
+                return ""
 
-    # Check if the first choice has a message
-    if not completion.choices[0].message:
-        return ''
+            return completion.choices[0].message.content
 
-    # Check if the message has content
-    if not completion.choices[0].message.content:
-        return ''
+        except Exception as exc:
+            last_exception = exc
+            if attempt < _RETRY_MAX:
+                delay = _RETRY_BACKOFF_BASE ** attempt
+                print(
+                    f"API call failed (attempt {attempt}/{_RETRY_MAX}), "
+                    f"retrying in {delay:.1f}s: {exc}",
+                    file=__import__("sys").stderr,
+                )
+                time.sleep(delay)
+            else:
+                print(
+                    f"API call failed after {_RETRY_MAX} attempts: {exc}",
+                    file=__import__("sys").stderr,
+                )
 
-    # All checks passed - return the generated description
-    return completion.choices[0].message.content
-
-
-
-
+    return ""

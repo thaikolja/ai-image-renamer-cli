@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file. The format 
 
 ## v1
 
+### v1.2.0
+
+#### Added
+
+* **Retry Logic:** API calls now retry up to 3 times with exponential backoff for transient failures
+* **Timeout:** Added 30-second request timeout to prevent hanging on stalled connections
+* **Batch Summary:** Processing now prints a summary of results (renamed, skipped, failed counts)
+* **Grammar Fix:** Singular/plural "word" correction in API prompt
+
+#### Changed
+
+* **Image Limit:** CLI now caps processing at 3 images per invocation (down from unlimited)
+* **Output Destinations:** Progress messages now go to stderr; only the summary goes to stdout
+* **Message Construction:** Replaced fragile `json.loads(f-string)` with native Python data structures (security improvement)
+* **Model Reference:** Updated all docstrings from Llama 4 Maverick to Llama 4 Scout
+
+#### Fixed
+
+* JSON injection risk in API request payload construction
+* Misleading model name in package-level docstring
+
 ### v1.1.0
 
 #### Changed

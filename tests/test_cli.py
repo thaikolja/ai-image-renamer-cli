@@ -187,6 +187,31 @@ class TestCLI(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 cli.main()
 
+    @patch('ai_image_renamer.cli.renamer.ImageRenamer')
+    @patch('ai_image_renamer.cli.load_dotenv')
+    def test_main_truncates_to_max_images(self, mock_load_dotenv, mock_renamer):
+        """
+        Test that more than 3 images are truncated to 3 with a warning.
+        """
+        with patch('sys.argv', ['rename-images', 'img1.jpg', 'img2.jpg', 'img3.jpg', 'img4.jpg', 'img5.jpg']):
+            cli.main()
+
+        call_args = mock_renamer.call_args[0][0]
+        self.assertEqual(len(call_args.image_paths), 3)
+        self.assertEqual(call_args.image_paths, ['img1.jpg', 'img2.jpg', 'img3.jpg'])
+
+    @patch('ai_image_renamer.cli.renamer.ImageRenamer')
+    @patch('ai_image_renamer.cli.load_dotenv')
+    def test_main_exactly_three_images_not_truncated(self, mock_load_dotenv, mock_renamer):
+        """
+        Test that exactly 3 images are not truncated.
+        """
+        with patch('sys.argv', ['rename-images', 'a.jpg', 'b.jpg', 'c.jpg']):
+            cli.main()
+
+        call_args = mock_renamer.call_args[0][0]
+        self.assertEqual(len(call_args.image_paths), 3)
+
     # ==========================================================================
     # Tests for Environment Loading
     # ==========================================================================

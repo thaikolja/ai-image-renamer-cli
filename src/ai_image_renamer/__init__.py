@@ -20,7 +20,7 @@ AI Image Renamer - Intelligent image file renaming using AI.
 
 This package provides tools for renaming image files based on their content
 using artificial intelligence. It leverages the Groq API with Meta's Llama 4
-Maverick model to analyze images and generate descriptive, SEO-friendly filenames.
+Scout model to analyze images and generate descriptive, SEO-friendly filenames.
 
 Package Structure:
     ai_image_renamer/
@@ -65,7 +65,7 @@ For full documentation, visit: https://docs.kolja-nolte.com/ai-image-renamer-cli
 from importlib.metadata import PackageNotFoundError, version
 
 _PACKAGE_NAME = 'ai-image-renamer'
-_FALLBACK_VERSION = '1.1.0'
+_FALLBACK_VERSION = '1.2.0'
 
 try:
     __version__ = version(_PACKAGE_NAME)

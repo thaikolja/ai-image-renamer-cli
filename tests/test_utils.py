@@ -140,7 +140,7 @@ class TestUtils(unittest.TestCase):
 
         # Assert: The vision payload should use the detected MIME type
         create_kwargs = mock_groq.return_value.chat.completions.create.call_args.kwargs
-        self.assertEqual(create_kwargs["model"], "meta-llama/llama-4-maverick-17b-128e-instruct")
+        self.assertEqual(create_kwargs["model"], "meta-llama/llama-4-scout-17b-16e-instruct")
         self.assertEqual(
             create_kwargs["messages"][0]["content"][1]["image_url"]["url"],
             "data:image/png;base64,encoded_image_string",

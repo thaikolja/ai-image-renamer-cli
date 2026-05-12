@@ -7,7 +7,7 @@ where = ["src"]
 
 [project]
 name = "ai-image-renamer"
-version = "1.1.0"
+version = "1.2.0"
 description = "Rename images based on AI-generated descriptions."
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.8"

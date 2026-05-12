@@ -48,6 +48,9 @@ Dependencies:
 # Used for: os.rename() to rename files, os.path for path manipulation
 import os
 
+# sys: System-specific parameters for stderr output
+import sys
+
 # ==============================================================================
 # Package Imports
 # ==============================================================================
@@ -149,90 +152,40 @@ class ImageRenamer:
         """
         Process and rename all images in the image_paths list.
 
-        This method implements the core renaming pipeline:
-
-        Pipeline Steps:
-            1. **Verification**: Skip files that are not valid images
-               - Uses magic byte detection (not file extensions)
-               - Handles missing files, directories, and non-image files
-
-            2. **Content Extraction**: Get AI-generated description
-               - Sends image to Groq API via utils.get_words()
-               - Skips file if API returns empty/None response
-
-            3. **Path Sanitization**: Generate the new file path
-               - Converts description to SEO-friendly slug
-               - Preserves original file extension
-               - Skips if resulting name is too short (≤3 chars)
-
-            4. **File Rename**: Perform the actual rename operation
-               - Uses os.rename() for atomic file system operation
-               - Reports success with old and new paths
+        Each image is analyzed via the Groq API (fresh call per image),
+        validated, and renamed to an SEO-friendly filename based on its content.
+        Progress goes to stderr; final summary goes to stdout.
 
         Returns:
-            None: This method performs side effects only (file operations).
-
-        Side Effects:
-            - Mutates the filesystem by renaming files
-            - Prints progress and status messages to stdout
-
-        Error Handling:
-            - Invalid images: Skipped with warning message
-            - Failed API calls: Skipped with warning message
-            - Short filenames: Silently skipped
-            - Rename failures: Exception propagates (file in use, permissions)
-
-        Example Output:
-            Processing photo1.jpg...
-            Renamed photo1.jpg to /photos/beautiful-sunset-ocean.jpg
-            Skipping invalid image file: document.pdf
-            Processing photo2.png...
-            Failed to retrieve content from image: photo2.png
+            None: Performs side effects only (file renames, output).
         """
-        # Iterate over each image path provided via CLI arguments
-        # Each file is processed independently for fault isolation
+        succeeded = 0
+        skipped = 0
+        failed = 0
+
         for path in self.image_paths:
 
-            # ==================================================================
-            # STEP 1: Verification
-            # ==================================================================
-            # Verify the file is a supported, accessible image before processing
-            # This check uses magic bytes, not file extensions, for security
             if not utils.verify_image_file(path):
-                # Skip invalid files but continue processing other images
-                print(f"Skipping invalid image file: {path}")
+                print(f"Skipping invalid image file: {path}", file=sys.stderr)
+                skipped += 1
                 continue
 
-            # ==================================================================
-            # STEP 2: Content Extraction
-            # ==================================================================
-            # Notify user that processing has started for this file
-            # This provides feedback for potentially slow API calls
-            print(f"Processing {path}...")
+            print(f"Processing {path}...", file=sys.stderr)
 
-            # Extract descriptive textual content from the image using AI
-            # The words parameter comes from CLI --words argument
             content = utils.get_words(path, self.args.words)
 
-            # If extraction fails or returns nothing meaningful, skip this file
-            # Empty string indicates API failure or empty response
             if not content:
-                print(f"Failed to retrieve content from image: {path}")
+                print(f"Failed to retrieve content from image: {path}", file=sys.stderr)
+                failed += 1
                 continue
 
-            # ==================================================================
-            # STEP 3: Path Sanitization
-            # ==================================================================
-            # Build a sanitized new file path incorporating the AI description
-            # This generates an SEO-friendly filename like "sunset-beach.jpg"
             new_path = utils.sanitize_image_path(path, content)
 
-            # Skip if sanitization produced the same path as the source.
             if os.path.abspath(path) == os.path.abspath(new_path):
-                print(f"File already has target name, skipping: {path}")
+                print(f"File already has target name, skipping: {path}", file=sys.stderr)
+                skipped += 1
                 continue
 
-            # Avoid overwriting an existing file by generating a unique suffix.
             base_path, extension = os.path.splitext(new_path)
             candidate_path = new_path
             suffix = 1
@@ -240,21 +193,19 @@ class ImageRenamer:
                 candidate_path = f"{base_path}-{suffix}{extension}"
                 suffix += 1
 
-            # Skip if the resulting filename stem is implausibly short.
-            # Length ≤3 means sanitization stripped most content (e.g., "a.jpg").
             stem = os.path.splitext(os.path.basename(candidate_path))[0]
             if len(stem) <= 3:
-                print(f"Generated filename too short, skipping: {path}")
+                print(f"Generated filename too short, skipping: {path}", file=sys.stderr)
+                skipped += 1
                 continue
 
-            # ==================================================================
-            # STEP 4: File Rename
-            # ==================================================================
-            # Perform the actual file system rename operation
-            # os.rename() is atomic on most filesystems
-            # Note: This will fail if destination file already exists
             os.rename(path, candidate_path)
+            succeeded += 1
 
-            # Report success to the user
-            print(f"Renamed {path} to {candidate_path}")
+            print(f"Renamed {path} to {candidate_path}", file=sys.stderr)
 
+        summary = (
+            f"Done: {succeeded} renamed, {skipped} skipped, {failed} failed "
+            f"(out of {len(self.image_paths)})"
+        )
+        print(summary)

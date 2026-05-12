@@ -63,6 +63,9 @@ import argparse
 # Used to retrieve the version string from pyproject.toml
 from importlib.metadata import PackageNotFoundError, version
 
+# sys: System-specific parameters for stderr output
+import sys
+
 # ==============================================================================
 # Third-Party Library Imports
 # ==============================================================================
@@ -81,7 +84,7 @@ from . import renamer
 
 
 _PACKAGE_NAME = "ai-image-renamer"
-_FALLBACK_VERSION = "1.1.0"
+_FALLBACK_VERSION = "1.2.0"
 
 
 def _get_version() -> str:
@@ -285,7 +288,20 @@ def main():
     args = parser.parse_args()
 
     # ==========================================================================
-    # STEP 5: Process Images
+    # STEP 5: Limit to 3 images
+    # ==========================================================================
+    MAX_IMAGES = 3
+
+    if len(args.image_paths) > MAX_IMAGES:
+        print(
+            f"A maximum of {MAX_IMAGES} images can be processed at once. "
+            f"Truncating list from {len(args.image_paths)} to {MAX_IMAGES}.",
+            file=sys.stderr,
+        )
+        args.image_paths = args.image_paths[:MAX_IMAGES]
+
+    # ==========================================================================
+    # STEP 6: Process Images
     # ==========================================================================
     # Instantiate ImageRenamer with parsed arguments
     # The constructor automatically processes all images (calls self.rename())

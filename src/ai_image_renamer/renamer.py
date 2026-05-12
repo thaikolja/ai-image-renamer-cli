@@ -1,8 +1,6 @@
-#  -*- coding: utf-8 -*-
-#
 #  AI Image Renamer
 #
-#  Copyright (C) 2025 Kolja Nolte
+#  Copyright (C) 2026 Kolja Nolte
 #  https://www.kolja-nolte.com
 #  kolja.nolte@gmail.com
 #
@@ -11,62 +9,21 @@
 #  @author      Kolja Nolte
 #  @email       kolja.nolte@gmail.com
 #  @license     MIT
-#  @date        2025
-#  @website     https://docs.kolja-nolte.com/ai-image-renamer-cli
+#  @date        2026
+#  @website     https://docs.kolja-nolte.com/ai-image-renamer
 #  @repository  https://gitlab.com/thaikolja/ai-image-renamer
 
-"""
-Image Renamer module - Core orchestration for AI-powered image renaming.
+"""Core rename pipeline orchestrator."""
 
-This module provides the ImageRenamer class which orchestrates the complete
-image renaming pipeline:
-
-    Input Image → Validation → AI Analysis → Filename Generation → File Rename
-
-The module is designed to be used as the main processing engine, receiving
-parsed CLI arguments and handling the batch processing of multiple images.
-
-Usage:
-    The ImageRenamer class is typically instantiated with parsed argparse
-    arguments from the CLI module:
-
-    >>> import argparse
-    >>> args = argparse.Namespace(image_paths=['photo.jpg'], words=6)
-    >>> renamer = ImageRenamer(args)
-    # Images are renamed automatically during initialization
-
-Dependencies:
-    - utils module: Provides validation, AI calls, and path sanitization
-    - os module: Filesystem operations for renaming files
-"""
-
-# ==============================================================================
-# Standard Library Imports
-# ==============================================================================
-
-# os: Operating system interface for file and directory operations
-# Used for: os.rename() to rename files, os.path for path manipulation
+# Import operating system and system-specific interfaces
 import os
-
-# sys: System-specific parameters for stderr output
 import sys
 
-# ==============================================================================
-# Package Imports
-# ==============================================================================
-
-# Import utilities from the same package using relative import
-# This provides:
-# - verify_image_file(): Validate image files by magic bytes
-# - get_words(): Get AI-generated description from Groq API
-# - sanitize_image_path(): Generate clean, SEO-friendly filenames
+# Import utility functions for image validation, AI analysis, and path sanitization
 from . import utils
 
 
-# ==============================================================================
-# Main Image Renamer Class
-# ==============================================================================
-
+# Define the main renamer class that orchestrates AI-powered image renaming
 class ImageRenamer:
     """
     Orchestrates the AI-powered image renaming process.
@@ -108,6 +65,7 @@ class ImageRenamer:
         images incrementally after initialization.
     """
 
+    # Initialize the renamer instance with parsed CLI arguments
     def __init__(self, args):
         """
         Initialize the ImageRenamer and process all specified images.
@@ -132,22 +90,21 @@ class ImageRenamer:
             - May raise exceptions from underlying operations
 
         Example:
-            >>> args = argparse.Namespace(image_paths=['test.jpg'], words=6)
-            >>> renamer = ImageRenamer(args)
+            >>> arguments = argparse.Namespace(image_paths=['test.jpg'], words=6)
+            >>> renamer = ImageRenamer(arguments)
             Processing test.jpg...
             Renamed test.jpg to /path/to/descriptive-name.jpg
         """
-        # Store the complete arguments object for access to all CLI options
+        # Store the parsed CLI arguments for later access
         self.args = args
 
-        # Convenience reference to the image paths list
-        # This is the primary data we iterate over in rename()
+        # Extract image paths from arguments for iteration
         self.image_paths = args.image_paths
 
-        # Begin processing immediately
-        # This design allows simple instantiation: ImageRenamer(args)
+        # Start the rename pipeline immediately upon construction
         self.rename()
 
+    # Process and rename all images in the paths list
     def rename(self):
         """
         Process and rename all images in the image_paths list.
@@ -159,53 +116,88 @@ class ImageRenamer:
         Returns:
             None: Performs side effects only (file renames, output).
         """
+        # Initialize counter for successfully renamed files
         succeeded = 0
+        # Initialize counter for skipped files
         skipped = 0
+        # Initialize counter for failed files
         failed = 0
 
+        # Iterate over each image path provided by the user
         for path in self.image_paths:
 
+            # Check if the file is a valid image via magic byte detection
             if not utils.verify_image_file(path):
+                # Print a warning about the invalid file to stderr
                 print(f"Skipping invalid image file: {path}", file=sys.stderr)
+                # Increment the skipped counter
                 skipped += 1
+                # Move to the next image path
                 continue
 
+            # Inform the user that processing has started for this image
             print(f"Processing {path}...", file=sys.stderr)
 
+            # Fetch AI-generated content description from the Groq API
             content = utils.get_words(path, self.args.words)
 
+            # Check if the API returned meaningful content
             if not content:
+                # Print an error message about the failed content retrieval
                 print(f"Failed to retrieve content from image: {path}", file=sys.stderr)
+                # Increment the failed counter
                 failed += 1
+                # Skip to the next image without renaming
                 continue
 
+            # Generate a sanitized, SEO-friendly filename from the AI description
             new_path = utils.sanitize_image_path(path, content)
 
+            # Check if the sanitized path is identical to the original path
             if os.path.abspath(path) == os.path.abspath(new_path):
+                # Notify the user that the file already has the target name
                 print(f"File already has target name, skipping: {path}", file=sys.stderr)
+                # Increment the skipped counter
                 skipped += 1
+                # Move to the next image since no rename is needed
                 continue
 
+            # Split the new path into base and extension components
             base_path, extension = os.path.splitext(new_path)
+            # Set the initial candidate path to the sanitized path
             candidate_path = new_path
+            # Initialize the numeric suffix counter for deduplication
             suffix = 1
+            # Keep incrementing the suffix until a non-existent path is found
             while os.path.exists(candidate_path):
+                # Generate a new candidate path with an incremented numeric suffix
                 candidate_path = f"{base_path}-{suffix}{extension}"
+                # Increment the suffix counter for the next attempt
                 suffix += 1
 
+            # Extract the filename stem (without extension) for length validation
             stem = os.path.splitext(os.path.basename(candidate_path))[0]
+            # Check if the generated stem is too short to be meaningful
             if len(stem) <= 3:
+                # Print a warning about the too-short filename
                 print(f"Generated filename too short, skipping: {path}", file=sys.stderr)
+                # Increment the skipped counter
                 skipped += 1
+                # Skip to the next image without renaming
                 continue
 
+            # Perform the actual file system rename operation
             os.rename(path, candidate_path)
+            # Increment the succeeded counter
             succeeded += 1
 
+            # Notify the user that the file was successfully renamed
             print(f"Renamed {path} to {candidate_path}", file=sys.stderr)
 
+        # Build a summary string with counts of renamed, skipped, and failed files
         summary = (
             f"Done: {succeeded} renamed, {skipped} skipped, {failed} failed "
             f"(out of {len(self.image_paths)})"
         )
+        # Print the final summary to stdout
         print(summary)

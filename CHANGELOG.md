@@ -8,6 +8,9 @@ All notable changes to this project will be documented in this file. The format 
 
 #### Added
 
+* **Table of Contents:** Added manual TOC to README.md with links to all sections
+* **Limitations Section:** Documented Groq API limits (file size, resolution, base64, preview status) in layman's terms
+* **Mock Module Pre-registration:** Tests now pre-register mock `filetype` and `groq` modules, so all 30 tests pass without any third-party deps installed
 * **Retry Logic:** API calls now retry up to 3 times with exponential backoff for transient failures
 * **Timeout:** Added 30-second request timeout to prevent hanging on stalled connections
 * **Batch Summary:** Processing now prints a summary of results (renamed, skipped, failed counts)
@@ -15,6 +18,10 @@ All notable changes to this project will be documented in this file. The format 
 
 #### Changed
 
+* **AGENTS.md:** Translated from Chinese to English; updated project structure, model name (Scout), CLI cap (3 images), dedup logic, and added CI/CD section
+* **README.md:** Reworded for accuracy and grammar; added `#` one-liner comments to every statement in code blocks
+* **Lazy Imports:** Moved `import filetype`, `from groq import Groq`, and `from dotenv import load_dotenv` inside the functions that use them, allowing the package to be imported without third-party deps
+* **Test Patches:** Changed `@patch` targets from module-level aliases (`ai_image_renamer.utils.filetype.guess`) to original module paths (`filetype.guess`) to match lazy import structure
 * **Image Limit:** CLI now caps processing at 3 images per invocation (down from unlimited)
 * **Output Destinations:** Progress messages now go to stderr; only the summary goes to stdout
 * **Message Construction:** Replaced fragile `json.loads(f-string)` with native Python data structures (security improvement)
@@ -22,6 +29,8 @@ All notable changes to this project will be documented in this file. The format 
 
 #### Fixed
 
+* Module collection errors when running pytest without third-party dependencies installed (26 tests now pass without deps, 0 before)
+* Duplicate copyright block in `test_cli.py` left by previous automation
 * JSON injection risk in API request payload construction
 * Misleading model name in package-level docstring
 

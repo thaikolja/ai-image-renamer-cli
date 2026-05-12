@@ -1,42 +1,25 @@
 # -*- coding: utf-8 -*-
-"""
-Test suite for the AI Image Renamer command-line interface.
+"""Tests for CLI argument parsing and env loading."""
 
-This module contains unit tests for the CLI module in ai_image_renamer.cli,
-including argument parsing, validation, and integration with the renamer.
-
-Tests cover:
-- Argument parsing and validation
-- Version display
-- Help text generation
-- Integration with ImageRenamer
-"""
-
-# ==============================================================================
-# Standard Library Imports
-# ==============================================================================
+# Import standard library modules
 import io
 import unittest
 from unittest.mock import patch
 import os
 import sys
 
-# ==============================================================================
-# Package Imports
-# ==============================================================================
-# Use try/except to handle both installed and development environments
+# Attempt to import the CLI module, falling back to development path
 try:
+    # Import CLI from installed package
     from ai_image_renamer import cli
 except ImportError:
-    # Fallback for development/testing without installation
+    # Add src directory to the module search path for dev environments
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+    # Import CLI after adjusting the Python path
     from ai_image_renamer import cli
 
 
-# ==============================================================================
-# Test Class for CLI
-# ==============================================================================
-
+# Define the test case class for CLI tests
 class TestCLI(unittest.TestCase):
     """
     Unit tests for the command-line interface functions.
@@ -48,12 +31,11 @@ class TestCLI(unittest.TestCase):
     - Integration with the ImageRenamer class
     """
 
-    # ==========================================================================
-    # Tests for Argument Parsing
-    # ==========================================================================
-
+    # Mock the ImageRenamer class to prevent real instantiation
     @patch('ai_image_renamer.cli.renamer.ImageRenamer')
-    @patch('ai_image_renamer.cli.load_dotenv')
+    # Mock the load_dotenv function to prevent .env file loading
+    @patch('dotenv.load_dotenv')
+    # Define test for main() with a single image path
     def test_main_with_single_image(self, mock_load_dotenv, mock_renamer):
         """
         Test main() with a single image path.
@@ -72,10 +54,14 @@ class TestCLI(unittest.TestCase):
 
             # Assert: Check the arguments passed to ImageRenamer
             call_args = mock_renamer.call_args[0][0]
+            # Verify the image paths match the provided argument
             self.assertEqual(call_args.image_paths, ['image.jpg'])
 
+    # Mock the ImageRenamer class
     @patch('ai_image_renamer.cli.renamer.ImageRenamer')
-    @patch('ai_image_renamer.cli.load_dotenv')
+    # Mock the load_dotenv function
+    @patch('dotenv.load_dotenv')
+    # Define test for main() with multiple image paths
     def test_main_with_multiple_images(self, mock_load_dotenv, mock_renamer):
         """
         Test main() with multiple image paths.
@@ -87,10 +73,14 @@ class TestCLI(unittest.TestCase):
 
             # Assert: Check all images are in the arguments
             call_args = mock_renamer.call_args[0][0]
+            # Verify all three image paths were captured
             self.assertEqual(call_args.image_paths, ['img1.jpg', 'img2.png', 'img3.webp'])
 
+    # Mock the ImageRenamer class
     @patch('ai_image_renamer.cli.renamer.ImageRenamer')
-    @patch('ai_image_renamer.cli.load_dotenv')
+    # Mock the load_dotenv function
+    @patch('dotenv.load_dotenv')
+    # Define test for main() with custom word count
     def test_main_with_words_option(self, mock_load_dotenv, mock_renamer):
         """
         Test main() with custom word count option.
@@ -102,10 +92,14 @@ class TestCLI(unittest.TestCase):
 
             # Assert: Check words parameter
             call_args = mock_renamer.call_args[0][0]
+            # Verify the word count was parsed correctly
             self.assertEqual(call_args.words, 5)
 
+    # Mock the ImageRenamer class
     @patch('ai_image_renamer.cli.renamer.ImageRenamer')
-    @patch('ai_image_renamer.cli.load_dotenv')
+    # Mock the load_dotenv function
+    @patch('dotenv.load_dotenv')
+    # Define test for default word count
     def test_main_default_words(self, mock_load_dotenv, mock_renamer):
         """
         Test that default word count is 6.
@@ -117,12 +111,10 @@ class TestCLI(unittest.TestCase):
 
             # Assert: Default words should be 6
             call_args = mock_renamer.call_args[0][0]
+            # Verify the default word count value
             self.assertEqual(call_args.words, 6)
 
-    # ==========================================================================
-    # Tests for Error Handling
-    # ==========================================================================
-
+    # Define test for missing image paths
     def test_main_no_images_raises_error(self):
         """
         Test that missing image paths raises SystemExit.
@@ -135,6 +127,7 @@ class TestCLI(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 cli.main()
 
+    # Define test for invalid word count value
     def test_main_invalid_words_value(self):
         """
         Test that invalid word count raises SystemExit.
@@ -147,8 +140,11 @@ class TestCLI(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 cli.main()
 
+    # Mock the ImageRenamer class
     @patch('ai_image_renamer.cli.renamer.ImageRenamer')
-    @patch('ai_image_renamer.cli.load_dotenv')
+    # Mock the load_dotenv function
+    @patch('dotenv.load_dotenv')
+    # Define test for maximum word count boundary
     def test_main_allows_max_words_value(self, mock_load_dotenv, mock_renamer):
         """
         Test that the maximum supported word count of 50 is accepted.
@@ -157,24 +153,36 @@ class TestCLI(unittest.TestCase):
             cli.main()
 
         call_args = mock_renamer.call_args[0][0]
+        # Verify the maximum word count of 50 is accepted
         self.assertEqual(call_args.words, 50)
 
-    @patch('ai_image_renamer.cli.load_dotenv')
+    # Mock the load_dotenv function
+    @patch('dotenv.load_dotenv')
+    # Define test for version display fallback
     def test_version_uses_source_fallback(self, mock_load_dotenv):
         """
         Test that --version works even when package metadata is unavailable.
         """
+        # Create a string buffer to capture stdout output
         stdout = io.StringIO()
 
+        # Redirect stdout to the buffer for inspection
         with patch('sys.stdout', stdout):
+            # Patch sys.argv with the --version flag
             with patch('sys.argv', ['rename-images', '--version']):
+                # Mock _get_version to return a fixed version string
                 with patch('ai_image_renamer.cli._get_version', return_value='1.1.0'):
+                    # Expect SystemExit when version is displayed
                     with self.assertRaises(SystemExit) as exc:
+                        # Invoke the CLI main function
                         cli.main()
 
+        # Verify the exit code is 0 (success)
         self.assertEqual(exc.exception.code, 0)
+        # Verify the printed version string matches expected format
         self.assertEqual(stdout.getvalue().strip(), 'rename-images 1.1.0')
 
+    # Define test for zero word count
     def test_main_zero_words_raises_error(self):
         """
         Test that zero words raises SystemExit.
@@ -187,8 +195,11 @@ class TestCLI(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 cli.main()
 
+    # Mock the ImageRenamer class
     @patch('ai_image_renamer.cli.renamer.ImageRenamer')
-    @patch('ai_image_renamer.cli.load_dotenv')
+    # Mock the load_dotenv function
+    @patch('dotenv.load_dotenv')
+    # Define test for truncation beyond max images
     def test_main_truncates_to_max_images(self, mock_load_dotenv, mock_renamer):
         """
         Test that more than 3 images are truncated to 3 with a warning.
@@ -197,11 +208,16 @@ class TestCLI(unittest.TestCase):
             cli.main()
 
         call_args = mock_renamer.call_args[0][0]
+        # Verify the list was truncated to exactly 3 images
         self.assertEqual(len(call_args.image_paths), 3)
+        # Verify only the first three images are kept
         self.assertEqual(call_args.image_paths, ['img1.jpg', 'img2.jpg', 'img3.jpg'])
 
+    # Mock the ImageRenamer class
     @patch('ai_image_renamer.cli.renamer.ImageRenamer')
-    @patch('ai_image_renamer.cli.load_dotenv')
+    # Mock the load_dotenv function
+    @patch('dotenv.load_dotenv')
+    # Define test for exactly three images (no truncation)
     def test_main_exactly_three_images_not_truncated(self, mock_load_dotenv, mock_renamer):
         """
         Test that exactly 3 images are not truncated.
@@ -210,14 +226,14 @@ class TestCLI(unittest.TestCase):
             cli.main()
 
         call_args = mock_renamer.call_args[0][0]
+        # Verify all three images are preserved
         self.assertEqual(len(call_args.image_paths), 3)
 
-    # ==========================================================================
-    # Tests for Environment Loading
-    # ==========================================================================
-
+    # Mock the ImageRenamer class
     @patch('ai_image_renamer.cli.renamer.ImageRenamer')
-    @patch('ai_image_renamer.cli.load_dotenv')
+    # Mock the load_dotenv function
+    @patch('dotenv.load_dotenv')
+    # Define test for load_dotenv invocation
     def test_load_dotenv_called(self, mock_load_dotenv, mock_renamer):
         """
         Test that load_dotenv is called at startup.
@@ -233,9 +249,7 @@ class TestCLI(unittest.TestCase):
             mock_load_dotenv.assert_called_once()
 
 
-# ==============================================================================
-# Test Runner Entry Point
-# ==============================================================================
-
+# Check if this script is executed directly
 if __name__ == '__main__':
+    # Run all tests in this module
     unittest.main()

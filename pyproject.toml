@@ -19,14 +19,19 @@ keywords = ["ai", "image", "renamer", "cli", "groq", "llama", "photos"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Multimedia :: Graphics :: Graphics Conversion",
     "Topic :: Scientific/Engineering :: Image Processing",
+    "Topic :: Utilities",
+    "Environment :: Console",
+    "Operating System :: OS Independent",
 ]
 dependencies = [
     "groq>=1.1.2",

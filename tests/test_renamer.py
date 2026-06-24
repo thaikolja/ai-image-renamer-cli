@@ -54,6 +54,9 @@ class TestRenamer(unittest.TestCase):
         args.image_paths = ["test_image.jpg"]
         # Set the desired AI description word count
         args.words = 8
+        # Ensure optional CLI args default to None (as argparse would)
+        args.model = None
+        args.api_key = None
 
         # Configure the mock to report the image as valid
         mock_utils.verify_image_file.return_value = True
@@ -87,6 +90,8 @@ class TestRenamer(unittest.TestCase):
         args.image_paths = ["image1.jpg", "image2.png", "image3.webp"]
         # Set the desired AI description word count
         args.words = 6
+        args.model = None
+        args.api_key = None
 
         # Configure the mock to report all images as valid
         mock_utils.verify_image_file.return_value = True
@@ -122,6 +127,8 @@ class TestRenamer(unittest.TestCase):
         args.image_paths = ["test_image.jpg"]
         # Set the desired AI description word count
         args.words = 8
+        args.model = None
+        args.api_key = None
 
         # Configure the mock to report the image as invalid
         mock_utils.verify_image_file.return_value = False
@@ -148,6 +155,8 @@ class TestRenamer(unittest.TestCase):
         args.image_paths = ["test_image.jpg"]
         # Set the desired AI description word count
         args.words = 8
+        args.model = None
+        args.api_key = None
 
         # Configure the mock to report the image as valid
         mock_utils.verify_image_file.return_value = True
@@ -176,6 +185,8 @@ class TestRenamer(unittest.TestCase):
         args.image_paths = ["test_image.jpg"]
         # Set the desired AI description word count
         args.words = 8
+        args.model = None
+        args.api_key = None
 
         # Configure the mock to report the image as valid
         mock_utils.verify_image_file.return_value = True
@@ -203,6 +214,8 @@ class TestRenamer(unittest.TestCase):
         args.image_paths = ["/tmp/same-name.jpg"]
         # Set the desired AI description word count
         args.words = 8
+        args.model = None
+        args.api_key = None
 
         # Configure the mock to report the image as valid
         mock_utils.verify_image_file.return_value = True
@@ -232,6 +245,8 @@ class TestRenamer(unittest.TestCase):
         args.image_paths = ["/tmp/source.jpg"]
         # Set the desired AI description word count
         args.words = 8
+        args.model = None
+        args.api_key = None
 
         # Configure the mock to report the image as valid
         mock_utils.verify_image_file.return_value = True
@@ -261,6 +276,9 @@ class TestRenamer(unittest.TestCase):
         args.image_paths = ["test_image.jpg"]
         # Set a custom word count on the mock argument namespace  # Custom word count
         args.words = 3
+        # Ensure optional CLI args default to None (as argparse would)
+        args.model = None
+        args.api_key = None
 
         # Configure the mock to report the image as valid
         mock_utils.verify_image_file.return_value = True
@@ -273,7 +291,9 @@ class TestRenamer(unittest.TestCase):
         renamer.ImageRenamer(args)
 
         # Verify get_words received the correct image path and word count
-        mock_utils.get_words.assert_called_once_with("test_image.jpg", 3)
+        mock_utils.get_words.assert_called_once_with(
+            "test_image.jpg", 3, model=None, api_key=None
+        )
 
 
 # Check if this script is being executed directly

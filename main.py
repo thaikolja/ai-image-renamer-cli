@@ -24,7 +24,7 @@ import sys
 _current_dir = os.path.dirname(os.path.abspath(__file__))
 
 # Add src/ to sys.path so the package can be imported without installation
-_src_path = os.path.join(_current_dir, 'src')
+_src_path = os.path.join(_current_dir, "src")
 if _src_path not in sys.path:
     sys.path.insert(0, _src_path)
 
@@ -36,5 +36,5 @@ def main():
     cli_main()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -110,8 +110,10 @@ class TestUtils(unittest.TestCase):
     @patch('filetype.guess')
     # Mock the Groq client to avoid real API calls
     @patch('groq.Groq')
+    # Mock config.get to provide the API key
+    @patch('ai_image_renamer.utils.config.get')
     # Define a test method for a successful get_words call
-    def test_get_words_success(self, mock_groq, mock_guess, mock_encode_image):
+    def test_get_words_success(self, mock_config_get, mock_groq, mock_guess, mock_encode_image):
         """
         Test get_words function with a successful API call.
 
@@ -122,6 +124,11 @@ class TestUtils(unittest.TestCase):
         mock_encode_image.return_value = "encoded_image_string"
         # Configure the mock to return a PNG MIME type
         mock_guess.return_value = MagicMock(mime='image/png')
+        # Provide a fake API key and model via config mock
+        mock_config_get.side_effect = lambda key, default=None: {
+            "GROQ_API_KEY": "test-api-key",
+            "MODEL": "qwen/qwen3.6-27b",
+        }.get(key, default)
         # Create a mock completion object
         mock_completion = MagicMock()
         # Set the expected content on the mock completion
@@ -135,7 +142,7 @@ class TestUtils(unittest.TestCase):
         # Capture the kwargs passed to the Groq API create call
         create_kwargs = mock_groq.return_value.chat.completions.create.call_args.kwargs
         # Assert that the correct model name was used
-        self.assertEqual(create_kwargs["model"], "meta-llama/llama-4-scout-17b-16e-instruct")
+        self.assertEqual(create_kwargs["model"], "qwen/qwen3.6-27b")
         # Assert that the vision URL includes the correct MIME type and encoded image
         self.assertEqual(
             create_kwargs["messages"][0]["content"][1]["image_url"]["url"],
@@ -148,8 +155,41 @@ class TestUtils(unittest.TestCase):
     @patch('filetype.guess')
     # Mock the Groq client to avoid real API calls
     @patch('groq.Groq')
+    # Mock config.get to provide the API key
+    @patch('ai_image_renamer.utils.config.get')
+    def test_get_words_truncates_hyphenated_and_whitespace_words(self, mock_config_get, mock_groq, mock_guess, mock_encode_image):
+        """
+        Test that get_words correctly splits and truncates both hyphenated and whitespace-separated keywords.
+        """
+        mock_encode_image.return_value = "encoded_image_string"
+        mock_guess.return_value = MagicMock(mime='image/png')
+        mock_config_get.side_effect = lambda key, default=None: {
+            "GROQ_API_KEY": "test-api-key",
+        }.get(key, default)
+        
+        # Test case 1: Hyphenated words
+        mock_completion = MagicMock()
+        mock_completion.choices[0].message.content = "computered-mac-app-interface-screen-overlay"
+        mock_groq.return_value.chat.completions.create.return_value = mock_completion
+        result = utils.get_words("test_image.jpg", words=4)
+        self.assertEqual(result, "computered mac app interface")
+
+        # Test case 2: Whitespace-separated words
+        mock_completion.choices[0].message.content = "computered mac app interface screen overlay"
+        mock_groq.return_value.chat.completions.create.return_value = mock_completion
+        result = utils.get_words("test_image.jpg", words=3)
+        self.assertEqual(result, "computered mac app")
+
+    # Mock encode_image to return a fixed encoded string
+    @patch('ai_image_renamer.utils.encode_image')
+    # Mock filetype.guess to control MIME type detection
+    @patch('filetype.guess')
+    # Mock the Groq client to avoid real API calls
+    @patch('groq.Groq')
+    # Mock config.get to provide the API key
+    @patch('ai_image_renamer.utils.config.get')
     # Define a test method for a failed get_words call
-    def test_get_words_failure(self, mock_groq, mock_guess, mock_encode_image):
+    def test_get_words_failure(self, mock_config_get, mock_groq, mock_guess, mock_encode_image):
         """
         Test get_words function with a failed API call.
 
@@ -159,6 +199,10 @@ class TestUtils(unittest.TestCase):
         mock_encode_image.return_value = "encoded_image_string"
         # Configure the mock to return a JPEG MIME type
         mock_guess.return_value = MagicMock(mime='image/jpeg')
+        # Provide a fake API key via config mock
+        mock_config_get.side_effect = lambda key, default=None: {
+            "GROQ_API_KEY": "test-api-key",
+        }.get(key, default)
         # Configure Groq client mock to return a failed response (None)
         mock_groq.return_value.chat.completions.create.return_value = None
         # Call get_words with test parameters
@@ -166,13 +210,19 @@ class TestUtils(unittest.TestCase):
         # Assert that the result is an empty string on failure
         self.assertEqual(result, "")
 
+    # Mock config.get to return empty API key
+    @patch('ai_image_renamer.utils.config.get')
     # Mock os.getenv to simulate missing environment variable
     @patch('ai_image_renamer.utils.os.getenv')
     # Define a test method for a missing API key scenario
-    def test_get_words_missing_api_key(self, mock_getenv):
+    def test_get_words_missing_api_key(self, mock_getenv, mock_config_get):
         """
         Test that get_words raises RuntimeError when API key is missing.
         """
+        # Configure the mock to return empty GROQ_API_KEY from config
+        mock_config_get.side_effect = lambda key, default=None: {
+            "GROQ_API_KEY": "",
+        }.get(key, default)
         # Configure the mock to return None (no API key found)
         mock_getenv.return_value = None
         # Assert that calling get_words without an API key raises RuntimeError
@@ -199,6 +249,30 @@ class TestUtils(unittest.TestCase):
         result = utils.sanitize_image_path("/photos/test.jpg", "Hello, World! 123")
         # Assert that special chars and numbers are stripped out
         self.assertTrue(result.endswith("hello-world.jpg"))
+
+    # Define a test method for long keyword truncation
+    def test_sanitize_image_path_does_not_cut_keywords(self):
+        """Test that truncation happens at keyword boundaries."""
+        # Force a short filename cap to trigger truncation.
+        with patch('ai_image_renamer.utils.config.get', return_value='25'):
+            result = utils.sanitize_image_path(
+                "/photos/test.jpg",
+                "alpha beta gamma delta epsilon",
+            )
+
+        # Should stop before cutting the last keyword in half.
+        self.assertTrue(result.endswith("alpha-beta-gamma-delta.jpg"))
+
+    # Define a test method for one long keyword
+    def test_sanitize_image_path_keeps_single_long_keyword(self):
+        """Test that a single long keyword is not cut mid-word."""
+        with patch('ai_image_renamer.utils.config.get', return_value='10'):
+            result = utils.sanitize_image_path(
+                "/photos/test.jpg",
+                "supercalifragilisticexpialidocious",
+            )
+
+        self.assertTrue(result.endswith("supercalifragilisticexpialidocious.jpg"))
 
     # Define a test method for extension preservation
     def test_sanitize_image_path_preserves_extension(self):

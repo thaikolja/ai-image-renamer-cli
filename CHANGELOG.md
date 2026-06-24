@@ -4,6 +4,40 @@ All notable changes to this project will be documented in this file. The format 
 
 ## v1
 
+### v1.3.0
+
+#### Added
+
+* **Config File:** New `config.ini` at the project root for user configuration (API key, model, temperature, timeout, retries, word count). Auto-generated with comments on first run if missing.
+* **Config Module:** New `src/ai_image_renamer/config.py` for config loading, merging, and auto-generation
+* **CLI Flags:** Added `--api-key` and `--model` CLI arguments to override config values per invocation
+* **Priority Chain:** Settings now follow a clear priority: CLI arguments → environment variables → `config.ini` → hardcoded defaults
+* **Glob Expansion:** Image paths containing wildcards (`*`, `?`, `[`) are now expanded via `glob.glob()` before processing
+* **Config Settings:** Added `MAX_FILENAME_LENGTH` (100) and `REASONING_EFFORT` (none) to `config.ini` for filename length capping and reasoning suppression
+* **Word Enforcement:** AI output is post-processed to enforce the requested word count, splitting on any non-alphabetic delimiter
+* **Keyword Boundaries:** Filename truncation now stops at keyword boundaries; keywords are never cut in half
+* **Config Validation:** Numeric config values (`DEFAULT_WORD_COUNT`, `TEMPERATURE`, `TIMEOUT`, `MAX_RETRIES`, `MAX_FILENAME_LENGTH`) are validated with clear error messages and fallbacks
+* **`.gitignore`:** Added `config.ini` to `.gitignore` to prevent accidental API key commits
+
+#### Changed
+
+* **API Key:** `GROQ_API_KEY` is now read from `config.ini` first, with environment variable as fallback (was environment-only)
+* **Model:** The Groq model is now configurable via `--model` CLI flag, `GROQ_MODEL` env var, or `MODEL` in `config.ini` (was hardcoded)
+* **Temperature / Timeout / Retries:** Now read from `config.ini` rather than hardcoded module constants
+* **Temperature Default:** Lowered from `2.0` to `1.0` in template to reduce incoherent/rambling outputs
+* **AI Prompt:** Rewritten to ask "What is visible in this image?" with explicit instruction to list keywords and output nothing else
+* **Reasoning Suppression:** Replaced `reasoning_format` with `reasoning_effort: "none"` to silence model thinking tokens (correct parameter for Qwen models)
+* **Word Count Default:** `--words` default now comes from `config.ini` `DEFAULT_WORD_COUNT` (falls back to 6)
+* **`get_words()`:** Accepts optional `model` and `api_key` keyword arguments for CLI overrides; returns text truncated to word count regardless of delimiter
+* **`sanitize_image_path()`:** Truncates at keyword boundaries; a single long keyword is kept intact rather than cut mid-word
+* **CLI Limit Message:** Improved truncation warning now shows which files are processed and which are skipped
+* **Tests:** Updated test mocks to use `config.get` for API-calling tests; fixed missing-key test to mock config; added tests for word truncation, keyword-boundary truncation, and long keyword preservation
+* **Docs:** Updated `README.md`, `AGENTS.md`, and all module docstrings to reference `config.ini`, new CLI flags, word enforcement, and reasoning suppression
+
+#### Removed
+
+* **Global Config:** Dropped `~/.config/ai-image-renamer/` global config directory; only `./config.ini` is used now
+
 ### v1.2.0
 
 #### Added

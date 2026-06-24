@@ -101,5 +101,8 @@ cython_debug/
 
 # Editor folders
 .vscode/
-
 NOTES.md
+
+# User config (contains API keys — keep local)
+config.ini
+

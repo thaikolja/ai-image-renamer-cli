@@ -7,7 +7,7 @@ where = ["src"]
 
 [project]
 name = "ai-image-renamer"
-version = "1.2.0"
+version = "1.3.0"
 description = "Rename images based on AI-generated descriptions."
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.8"
@@ -15,7 +15,7 @@ authors = [
     { name = "Kolja Nolte", email = "kolja.nolte@gmail.com" }
 ]
 license = "MIT"
-keywords = ["ai", "image", "renamer", "cli", "groq", "llama", "photos"]
+keywords = ["ai", "image", "renamer", "cli", "groq", "photos"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
@@ -34,7 +34,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "groq>=1.1.2",
+    "groq>=1.5.0",
     "filetype>=1.2.0",
     "python-dotenv>=1.2.2",
 ]
@@ -47,14 +47,40 @@ dependencies = [
 "Issues" = "https://gitlab.com/thaikolja/ai-image-renamer/-/issues"
 
 [project.scripts]
-rename-images = "ai_image_renamer.cli:main"
+rename_images = "ai_image_renamer.cli:main"
 
 [tool.pytest.ini_options]
 testpaths = [
     "tests",
 ]
 
+[tool.ruff]
+target-version = "py38"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "D", "UP", "YTT"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D", "N"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.10"
+strict_optional = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+ignore_missing_imports = true
+no_implicit_optional = true
+
 [project.optional-dependencies]
 test = [
     "pytest",
+]
+ci = [
+    "pytest",
+    "ruff>=0.9.0",
+    "mypy>=1.15.0",
 ]

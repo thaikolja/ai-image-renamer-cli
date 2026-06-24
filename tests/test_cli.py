@@ -45,7 +45,7 @@ class TestCLI(unittest.TestCase):
         - ImageRenamer is instantiated with correct arguments
         """
         # Arrange: Set up command line arguments
-        with patch('sys.argv', ['rename-images', 'image.jpg']):
+        with patch('sys.argv', ['rename_images', 'image.jpg']):
             # Act: Call main
             cli.main()
 
@@ -67,7 +67,7 @@ class TestCLI(unittest.TestCase):
         Test main() with multiple image paths.
         """
         # Arrange: Set up command line arguments with multiple images
-        with patch('sys.argv', ['rename-images', 'img1.jpg', 'img2.png', 'img3.webp']):
+        with patch('sys.argv', ['rename_images', 'img1.jpg', 'img2.png', 'img3.webp']):
             # Act: Call main
             cli.main()
 
@@ -86,7 +86,7 @@ class TestCLI(unittest.TestCase):
         Test main() with custom word count option.
         """
         # Arrange: Set up command line with --words option
-        with patch('sys.argv', ['rename-images', '-w', '5', 'image.jpg']):
+        with patch('sys.argv', ['rename_images', '-w', '5', 'image.jpg']):
             # Act: Call main
             cli.main()
 
@@ -105,7 +105,7 @@ class TestCLI(unittest.TestCase):
         Test that default word count is 6.
         """
         # Arrange: Set up command line without --words option
-        with patch('sys.argv', ['rename-images', 'image.jpg']):
+        with patch('sys.argv', ['rename_images', 'image.jpg']):
             # Act: Call main
             cli.main()
 
@@ -122,7 +122,7 @@ class TestCLI(unittest.TestCase):
         argparse exits with error when required positional args are missing.
         """
         # Arrange: Set up command line without image paths
-        with patch('sys.argv', ['rename-images']):
+        with patch('sys.argv', ['rename_images']):
             # Act & Assert: Should raise SystemExit
             with self.assertRaises(SystemExit):
                 cli.main()
@@ -135,7 +135,7 @@ class TestCLI(unittest.TestCase):
         Words must be in range 1-50.
         """
         # Arrange: Set up command line with invalid word count
-        with patch('sys.argv', ['rename-images', '-w', '51', 'image.jpg']):
+        with patch('sys.argv', ['rename_images', '-w', '51', 'image.jpg']):
             # Act & Assert: Should raise SystemExit due to choices validation
             with self.assertRaises(SystemExit):
                 cli.main()
@@ -149,7 +149,7 @@ class TestCLI(unittest.TestCase):
         """
         Test that the maximum supported word count of 50 is accepted.
         """
-        with patch('sys.argv', ['rename-images', '-w', '50', 'image.jpg']):
+        with patch('sys.argv', ['rename_images', '-w', '50', 'image.jpg']):
             cli.main()
 
         call_args = mock_renamer.call_args[0][0]
@@ -169,7 +169,7 @@ class TestCLI(unittest.TestCase):
         # Redirect stdout to the buffer for inspection
         with patch('sys.stdout', stdout):
             # Patch sys.argv with the --version flag
-            with patch('sys.argv', ['rename-images', '--version']):
+            with patch('sys.argv', ['rename_images', '--version']):
                 # Mock _get_version to return a fixed version string
                 with patch('ai_image_renamer.cli._get_version', return_value='1.1.0'):
                     # Expect SystemExit when version is displayed
@@ -180,7 +180,7 @@ class TestCLI(unittest.TestCase):
         # Verify the exit code is 0 (success)
         self.assertEqual(exc.exception.code, 0)
         # Verify the printed version string matches expected format
-        self.assertEqual(stdout.getvalue().strip(), 'rename-images 1.1.0')
+        self.assertEqual(stdout.getvalue().strip(), 'rename_images 1.1.0')
 
     # Define test for zero word count
     def test_main_zero_words_raises_error(self):
@@ -190,7 +190,7 @@ class TestCLI(unittest.TestCase):
         Words must be at least 1.
         """
         # Arrange: Set up command line with zero words
-        with patch('sys.argv', ['rename-images', '-w', '0', 'image.jpg']):
+        with patch('sys.argv', ['rename_images', '-w', '0', 'image.jpg']):
             # Act & Assert: Should raise SystemExit
             with self.assertRaises(SystemExit):
                 cli.main()
@@ -204,7 +204,7 @@ class TestCLI(unittest.TestCase):
         """
         Test that more than 3 images are truncated to 3 with a warning.
         """
-        with patch('sys.argv', ['rename-images', 'img1.jpg', 'img2.jpg', 'img3.jpg', 'img4.jpg', 'img5.jpg']):
+        with patch('sys.argv', ['rename_images', 'img1.jpg', 'img2.jpg', 'img3.jpg', 'img4.jpg', 'img5.jpg']):
             cli.main()
 
         call_args = mock_renamer.call_args[0][0]
@@ -222,7 +222,7 @@ class TestCLI(unittest.TestCase):
         """
         Test that exactly 3 images are not truncated.
         """
-        with patch('sys.argv', ['rename-images', 'a.jpg', 'b.jpg', 'c.jpg']):
+        with patch('sys.argv', ['rename_images', 'a.jpg', 'b.jpg', 'c.jpg']):
             cli.main()
 
         call_args = mock_renamer.call_args[0][0]
@@ -241,7 +241,7 @@ class TestCLI(unittest.TestCase):
         This ensures environment variables from .env files are loaded.
         """
         # Arrange: Set up command line arguments
-        with patch('sys.argv', ['rename-images', 'image.jpg']):
+        with patch('sys.argv', ['rename_images', 'image.jpg']):
             # Act: Call main
             cli.main()
 

@@ -4,7 +4,7 @@
 #  https://www.kolja-nolte.com
 #  kolja.nolte@gmail.com
 #
-#  This work is licensed under the MIT License. You are free to use, modify, and distribute this work, provided that you include the copyright notice and this permission notice in all copies or substantial portions of the work. For more information, visit: https://opensource.org/licenses/MIT
+#  This work is licensed under the MIT License. You are free to use, modify, and distribute this work, provided that you include the copyright notice and this permission notice in all copies or substantial portions of the work. For more information, visit: https://opensource.org/licenses/MIT  # noqa: E501
 #
 #  @author      Kolja Nolte
 #  @email       kolja.nolte@gmail.com
@@ -25,8 +25,7 @@ from . import utils
 
 # Define the main renamer class that orchestrates AI-powered image renaming
 class ImageRenamer:
-    """
-    Orchestrates the AI-powered image renaming process.
+    """Orchestrates the AI-powered image renaming process.
 
     This class is the main processing engine for the application. It receives
     a list of image paths and processes each one through a pipeline:
@@ -63,12 +62,12 @@ class ImageRenamer:
         The rename operation happens automatically in __init__.
         There is no need to call rename() manually unless processing
         images incrementally after initialization.
+
     """
 
     # Initialize the renamer instance with parsed CLI arguments
     def __init__(self, args):
-        """
-        Initialize the ImageRenamer and process all specified images.
+        """Initialize the ImageRenamer and process all specified images.
 
         This constructor stores the arguments and immediately begins processing
         all image paths through the rename pipeline. Each image is processed
@@ -94,6 +93,7 @@ class ImageRenamer:
             >>> renamer = ImageRenamer(arguments)
             Processing test.jpg...
             Renamed test.jpg to /path/to/descriptive-name.jpg
+
         """
         # Store the parsed CLI arguments for later access
         self.args = args
@@ -106,8 +106,7 @@ class ImageRenamer:
 
     # Process and rename all images in the paths list
     def rename(self):
-        """
-        Process and rename all images in the image_paths list.
+        """Process and rename all images in the image_paths list.
 
         Each image is analyzed via the Groq API (fresh call per image),
         validated, and renamed to an SEO-friendly filename based on its content.
@@ -115,6 +114,7 @@ class ImageRenamer:
 
         Returns:
             None: Performs side effects only (file renames, output).
+
         """
         # Initialize counter for successfully renamed files
         succeeded = 0
@@ -125,7 +125,6 @@ class ImageRenamer:
 
         # Iterate over each image path provided by the user
         for path in self.image_paths:
-
             # Check if the file is a valid image via magic byte detection
             if not utils.verify_image_file(path):
                 # Print a warning about the invalid file to stderr
@@ -139,7 +138,12 @@ class ImageRenamer:
             print(f"Processing {path}...", file=sys.stderr)
 
             # Fetch AI-generated content description from the Groq API
-            content = utils.get_words(path, self.args.words)
+            content = utils.get_words(
+                path,
+                self.args.words,
+                model=getattr(self.args, "model", None),
+                api_key=getattr(self.args, "api_key", None),
+            )
 
             # Check if the API returned meaningful content
             if not content:
@@ -195,9 +199,6 @@ class ImageRenamer:
             print(f"Renamed {path} to {candidate_path}", file=sys.stderr)
 
         # Build a summary string with counts of renamed, skipped, and failed files
-        summary = (
-            f"Done: {succeeded} renamed, {skipped} skipped, {failed} failed "
-            f"(out of {len(self.image_paths)})"
-        )
+        summary = f"Done: {succeeded} renamed, {skipped} skipped, {failed} failed (out of {len(self.image_paths)})"
         # Print the final summary to stdout
         print(summary)

@@ -2,7 +2,7 @@
 
 ![PyPI-Version](https://img.shields.io/pypi/v/ai-image-renamer) ![PyPI - Downloads](https://img.shields.io/pypi/dm/ai-image-renamer) ![PyPI - License](https://img.shields.io/pypi/l/ai-image-renamer)
 
-**AI Image Renamer CLI** is a command-line tool that uses generative AI to rename image files based on their content, giving your photo collection more descriptive and searchable filenames. A [**free** Groq API key](https://console.groq.com/keys) is required. **For full documentation, visit the [official docs](https://docs.kolja-nolte.com/ai-image-renamer-cli)**.
+**AI Image Renamer CLI** is a command-line tool that uses **Qwen3.6-27B** to rename image files based on their content, giving your photo collection more descriptive and searchable filenames. **A free API key is included** in this version, but you should [register your own for free](https://console.groq.com/keys). **For full documentation, visit the [official docs](https://docs.kolja-nolte.com/ai-image-renamer-cli)**.
 
 ## Features
 
@@ -12,25 +12,9 @@
 - 📚 **Batch:** Use up to 3 image files within a single command (processed sequentially)
 - 👨‍💻 **Easy:** Renaming files requires only a single command line
 
-
-
 ## Table of Contents
 
-- [Features](#features)
-- [Installation](#installation)
-  - [1. Using pipx](#1-using-pipx-recommended)
-  - [2. Using pip](#2-using-pip)
-  - [3. From the Git repository](#3-from-the-git-repository)
-  - [4. From a ZIP archive](#4-from-a-zip-archive)
-  - [5. Run directly from source](#5-run-directly-from-source)
-- [Usage](#usage)
-  - [Basic Usage](#basic-usage)
-  - [Limitations](#limitations)
-- [Contributing](#contributing)
-- [Author](#author)
-- [License](#license)
-
-
+[TOC]
 
 ## Installation
 
@@ -77,19 +61,25 @@ pip install .
 
 ```bash
 # Run via the module entry point without installation
-python -m ai_image_renamer.cli path/to/image.jpg
+python3 -m ai_image_renamer.cli path/to/image.jpg
 ```
 
-After installation, obtain a free Groq API key and set it as an environment variable:
+After installation, obtain a free Groq API key. The recommended way to configure the tool is via a `config.ini` file in your working directory. On first run, a commented `config.ini` is auto-generated — just edit it to set your API key:
+
+```ini
+# Edit the generated config.ini
+GROQ_API_KEY=gsk_your_api_key_here
+```
+
+Alternatively, set it as an environment variable:
 
 ```bash
-# Set your Groq API key as an environment variable
 export GROQ_API_KEY="your-key-here"
 ```
 
 ## Usage
 
-The `rename-images` command is your entry point to the tool. However, since it's using [Groq and Meta's Llama 4 Scout](https://console.groq.com/docs/vision) model, some limitations apply:
+The `rename_images` command is your entry point to the tool. The AI model, word count, and other options are configurable via CLI flags or `config.ini`. Some limitations apply:
 
 ### Basic Usage
 
@@ -97,33 +87,75 @@ To rename a single image:
 
 ```bash
 # Rename a single image file
-rename-images path/to/your/image.jpg
+rename_images path/to/your/image.jpg
 ```
 
 To rename multiple images (up to 3 at once):
 
 ```bash
 # Provide up to 3 image paths; append flags after paths
-rename-images image1.png image2.jpg path/to/another/image.webp
+rename_images image1.png image2.jpg path/to/another/image.webp
 ```
 
 Use shell glob patterns to select files:
 
 ```bash
 # The shell expands the glob before passing paths to the tool
-rename-images ~/Desktop/my-photos/*.png
+rename_images ~/Desktop/my-photos/*.png
+
 # Match files containing a keyword in the name
-rename-images ~/Photos/bangkok-*.jpg
+rename_images ~/Photos/bangkok-*.jpg
 ```
 
 To rename an image with only 3 words:
 
 ```bash
 # Limit the generated filename to N words
-rename-images -w 3 DSC_123.jpg
+rename_images -w 3 DSC_123.jpg
 ```
 
-See `rename-images -h` for more options, or read the [documentation](https://docs.kolja-nolte.com/ai-image-renamer-cli/usage/options).
+Override the API key or model for a single invocation:
+
+```bash
+# Override API key and model via CLI
+rename_images --api-key gsk_xxx --model qwen/qwen3.6-27b
+```
+
+Use glob patterns to select files:
+
+```bash
+# The shell expands the glob before passing paths to the tool
+rename_images ~/Desktop/my-photos/*.png
+```
+
+See `rename_images -h` for more options, or read the [documentation](https://docs.kolja-nolte.com/ai-image-renamer-cli/usage/options).
+
+### Configuration
+
+The tool reads settings from `./config.ini` in the current working directory. If the file doesn't exist, it is auto-generated with comments explaining every option:
+
+```ini
+# AI Image Renamer — Configuration
+GROQ_API_KEY=                          # Your Groq API key (required)
+MODEL=qwen/qwen3.6-27b								 # AI vision model (vision required)
+TEMPERATURE=1.0                        # AI creativity (0.0 – 2.0)
+TIMEOUT=30                             # API request timeout in seconds
+MAX_RETRIES=3                          # Retries on API failure
+DEFAULT_WORD_COUNT=6                   # Default word count (1 – 50)
+MAX_FILENAME_LENGTH=100                # Max filename stem length (characters)
+```
+
+> [!IMPORTANT]
+>
+> CLI arguments (e.g. `-w`) always override the config file values.
+>
+> **Priority:** CLI flags → environment variables → `config.ini` → built-in defaults.
+
+### Security
+
+> [!WARNING]
+>
+> **Security:** Add `config.ini` to your `.gitignore` to avoid committing your API key.
 
 ### Limitations
 
@@ -133,7 +165,8 @@ This tool relies on Groq's hosted AI model, which has the following practical li
 - **Image resolution**: Very high-resolution photos (over 33 megapixels, e.g., some DSLR or smartphone camera shots) may need to be resized first.
 - **Base64 limit**: When sending images via API, the base64-encoded data must stay under 4 MB.
 - **Images per request**: The model accepts **up to 5 images at once** (the CLI caps this at 3 to stay well within bounds).
-- **Preview model**: The Llama 4 Scout is still in preview, so it may change or be updated over time.
+- **Model**: The model can be changed via `--model` CLI flag, `GROQ_MODEL` environment variable, or `MODEL` in `config.ini`. Browse available models at [console.groq.com/docs/models](https://console.groq.com/docs/models).
+- **Model Reasoning**: Reasoning models (Qwen, GPT-OSS) output internal thinking by default. Set `REASONING_EFFORT=none` in `config.ini` to suppress it. See [Groq reasoning docs](https://console.groq.com/docs/reasoning) for details.
 
 ## Contributing
 

@@ -1,15 +1,38 @@
 image: python:3.13-slim
 
 stages:
+  - lint
+  - typecheck
   - test
 
-test:
-  before_script:
-    - pip install --upgrade pip
-    - pip install pytest
-  stage: test
-  variables:
-    GROQ_API_KEY: "some-api-key"
+cache:
+  paths:
+    - .cache/pip
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  GROQ_API_KEY: "test"
+
+before_script:
+  - pip install --upgrade pip
+  - pip install -e ".[ci]"
+
+lint:
+  stage: lint
   script:
-    - pip install -e .
+    - ruff check src/
+    - ruff format --check src/
+
+typecheck:
+  stage: typecheck
+  script:
+    - mypy src/
+
+test:
+  stage: test
+  script:
     - pytest
+  artifacts:
+    when: always
+    reports:
+      junit: junit.xml

@@ -1,14 +1,19 @@
-# Import standard library modules for base64 encoding, filesystem operations, regex, and retry delays
+"""Utility functions for image validation, encoding, and AI API calls."""
+
 import base64
 import os
 import re
+import sys
 import time
+from typing import Optional
+
+# Import package config module for user-defined settings
+from . import config
 
 
 # Define the verify_image_file function that checks if a filesystem path points to a valid image
 def verify_image_file(image_path: str) -> bool:
-    """
-    Determine whether the given filesystem path points to a valid image file.
+    """Determine whether the given filesystem path points to a valid image file.
 
     This function performs two critical validations:
     1. Verifies the path exists and points to a regular file (not directory/symlink)
@@ -44,14 +49,17 @@ def verify_image_file(image_path: str) -> bool:
     Note:
         This function never raises exceptions for invalid inputs.
         It returns False instead, making it safe for bulk filtering workflows.
+
     """
     # Check if the path exists and points to a regular file
     if not os.path.isfile(image_path):
         # Return False if the path does not exist or is not a file
         return False
 
-    # Import filetype for magic-byte detection (lazy import to avoid requiring it at module import time)
+    # Import filetype for magic-byte detection (lazy import
+    # to avoid requiring it at module import time)
     import filetype
+
     # Infer the MIME type from the file's magic bytes
     mime_type = filetype.guess(image_path)
 
@@ -66,8 +74,7 @@ def verify_image_file(image_path: str) -> bool:
 
 # Define the encode_image function that reads and base64-encodes an image file for API transmission
 def encode_image(image_path: str) -> str:
-    """
-    Read the binary contents of an image file and return a base64-encoded string.
+    """Read the binary contents of an image file and return a base64-encoded string.
 
     Base64 encoding converts binary data into ASCII characters, which is required
     for embedding images in JSON payloads sent to the Groq API. The resulting
@@ -97,6 +104,7 @@ def encode_image(image_path: str) -> str:
     Note:
         The returned string does NOT include the data URL prefix.
         Callers must prepend "data:image/jpeg;base64," when constructing URLs.
+
     """
     # Open the image file in binary read mode
     with open(image_path, "rb") as image_file:
@@ -109,8 +117,7 @@ def encode_image(image_path: str) -> str:
 
 # Define the sanitize_image_path function that generates an SEO-friendly filename from a description
 def sanitize_image_path(image_path: str, image_content: str) -> str:
-    """
-    Generate a sanitized, SEO-friendly file path from image description.
+    """Generate a sanitized, SEO-friendly file path from image description.
 
     This function transforms a descriptive text string into a clean filename:
     1. Converts to lowercase for consistency
@@ -134,7 +141,8 @@ def sanitize_image_path(image_path: str, image_content: str) -> str:
     Returns:
         str: Sanitized absolute path with the new filename.
              Format: /original/directory/beautiful-sunset-over-ocean.jpg
-             Returns very short paths (<4 chars) if content is mostly non-alphabetic.
+             Truncates at keyword boundaries when possible; a single very long
+             keyword is kept intact rather than being cut mid-word.
 
     Examples:
         >>> sanitize_image_path("/photos/IMG_001.jpg", "sunset beach")
@@ -150,6 +158,7 @@ def sanitize_image_path(image_path: str, image_content: str) -> str:
         The function always returns an absolute path, even for relative inputs.
         If the sanitized name is empty or very short, the result may be unusable.
         Callers should check the returned path length before using it.
+
     """
     # Extract the absolute directory path from the original file path
     dir_path = os.path.abspath(os.path.dirname(image_path))
@@ -166,6 +175,19 @@ def sanitize_image_path(image_path: str, image_content: str) -> str:
     # Replace whitespace sequences with hyphens and strip leading or trailing hyphens
     slug = re.sub(r"\s+", "-", clean_content).strip("-")
 
+    # Read maximum filename stem length from config (default 100)
+    max_len_raw = config.get("MAX_FILENAME_LENGTH", "100")
+    try:
+        max_len = int(max_len_raw)
+    except (ValueError, TypeError):
+        max_len = 100
+
+    # Truncate at a keyword boundary when possible, but never cut a keyword in half.
+    if len(slug) > max_len:
+        boundary = slug.rfind("-", 0, max_len + 1)
+        if boundary > 0:
+            slug = slug[:boundary]
+
     # Join the directory path with the slug and original extension
     return os.path.join(dir_path, f"{slug}{extension}")
 
@@ -173,8 +195,10 @@ def sanitize_image_path(image_path: str, image_content: str) -> str:
 # Define the _guess_image_mime_type helper that detects image MIME type with JPEG fallback
 def _guess_image_mime_type(image_path: str) -> str:
     """Return the detected image MIME type, falling back to JPEG."""
-    # Import filetype for magic-byte detection (lazy import to avoid requiring it at module import time)
+    # Import filetype for magic-byte detection (lazy import
+    # to avoid requiring it at module import time)
     import filetype
+
     # Guess the file type from the file's magic bytes
     kind = filetype.guess(image_path)
     # Check if the detected type is an image
@@ -193,39 +217,50 @@ _RETRY_BACKOFF_BASE = 2.0
 # Set the API request timeout in seconds
 _REQUEST_TIMEOUT = 30.0
 
-# Set the Groq model ID for the Llama 4 Scout multimodal model
-_MODEL_ID = "meta-llama/llama-4-scout-17b-16e-instruct"
 
+# Define the get_words function that sends an image to the Groq API
+# and returns an AI description
+def get_words(
+    image_path: str,
+    words: int = 6,
+    model: Optional[str] = None,
+    api_key: Optional[str] = None,
+) -> str:
+    """Generate a concise, SEO-friendly description for an image using AI.
 
-# Define the get_words function that sends an image to the Groq API and returns an AI description
-def get_words(image_path: str, words: int = 6) -> str:
-    """
-    Generate a concise, SEO-friendly description for an image using AI.
-
-    Sends an image to the Groq multimodal API (Llama 4 Scout) and receives
+    Sends an image to the Groq multimodal API and receives
     a short text description suitable for use as a filename.
 
-    Includes automatic retry with exponential backoff for transient failures.
+    The model, temperature, timeout, and retry count are read from config.ini
+    (with hardcoded fallbacks).  Includes automatic retry with exponential
+    backoff for transient failures.
 
     Args:
         image_path: Filesystem path to the image to analyze.
         words: Maximum number of words requested in the description (1-50).
+        model: Optional CLI override for the Groq model (takes priority over
+               config.ini and hardcoded default).
+        api_key: Optional CLI override for the Groq API key (takes priority
+                 over environment variable and config.ini).
 
     Returns:
         AI-generated description, or empty string on failure after retries.
 
     Raises:
-        RuntimeError: If GROQ_API_KEY environment variable is not set.
+        RuntimeError: If GROQ_API_KEY is not set via any source.
         FileNotFoundError: If image_path does not exist.
+
     """
-    # Retrieve the Groq API key from the GROQ_API_KEY environment variable
-    groq_api_key = os.getenv("GROQ_API_KEY")
+    # API key priority: CLI param → env var → config.ini
+    groq_api_key = api_key or os.getenv("GROQ_API_KEY") or config.get("GROQ_API_KEY")
+    # Clamp word count to valid range as a safety net
+    words = max(1, min(50, words))
     # Check if the API key is set
     if not groq_api_key:
         # Raise a RuntimeError with setup instructions for the API key
         raise RuntimeError(
-            "GROQ_API_KEY environment variable is not set. "
-            "Please set it using: export GROQ_API_KEY='your-key-here' "
+            "GROQ_API_KEY is not set. "
+            "Pass --api-key, or export GROQ_API_KEY, or set it in ./config.ini. "
             "Get a free key at: https://console.groq.com/keys"
         )
 
@@ -240,45 +275,84 @@ def get_words(image_path: str, words: int = 6) -> str:
     # Build the request messages structure with the text prompt and image data URL
     request_messages = [
         {
-            "role":    "user",
+            "role": "user",
             "content": [
                 {
                     "type": "text",
                     "text": (
-                        "What's in this image? Describe the content of this image "
-                        f"with no more than {words} {word_label} in an SEO-friendly way"
+                        "What is visible in this image? "
+                        f"List only the main objects, people, or scene "
+                        f"using no more than {words} {word_label}. "
+                        "Separate each keyword with a hyphen. "
+                        "Output nothing else."
                     ),
                 },
                 {
-                    "type":      "image_url",
-                    "image_url": {
-                        "url": f"data:{image_mime_type};base64,{encoded_image}"
-                    },
+                    "type": "image_url",
+                    "image_url": {"url": f"data:{image_mime_type};base64,{encoded_image}"},
                 },
             ],
         }
     ]
 
-    # Build the full request payload with the model ID, temperature, and messages
+    # Build the full request payload: model priority: CLI → env var → config.ini → hardcoded
+    _temp_raw = config.get("TEMPERATURE", "1.0")
+    try:
+        _temperature = float(_temp_raw)
+    except (ValueError, TypeError):
+        print(
+            f"Invalid TEMPERATURE '{_temp_raw}' in config.ini. Using 1.0.",
+            file=sys.stderr,
+        )
+        _temperature = 1.0
+
+    # Model priority: CLI param → GROQ_MODEL env var → config.ini
+    effective_model = model or os.getenv("GROQ_MODEL") or config.get("MODEL")
+
+    # Only include reasoning_effort for reasoning models (Qwen, GPT-OSS)
+    reasoning_effort: Optional[str] = config.get("REASONING_EFFORT")
+    if not (reasoning_effort and effective_model and ("qwen" in effective_model or "gpt-oss" in effective_model)):
+        reasoning_effort = None
+
     request_payload = {
-        "model":       _MODEL_ID,
-        "temperature": 2.0,
-        "stream":      False,
-        "stop":        None,
-        "messages":    request_messages,
+        "model": effective_model,
+        "temperature": _temperature,
+        "reasoning_effort": reasoning_effort,
+        "stream": False,
+        "stop": None,
+        "messages": request_messages,
     }
 
     # Import the Groq client (lazy import to avoid requiring it at module import time)
     from groq import Groq
-    # Create the Groq client with the API key and request timeout
-    client = Groq(api_key=groq_api_key, timeout=_REQUEST_TIMEOUT)
 
-    # Retry the API call up to the configured maximum number of times
-    for attempt in range(1, _RETRY_MAX + 1):
+    # Create the Groq client with the API key and config-driven request timeout
+    _timeout_raw = config.get("TIMEOUT", str(_REQUEST_TIMEOUT))
+    try:
+        _timeout = float(_timeout_raw)
+    except (ValueError, TypeError):
+        print(
+            f"Invalid TIMEOUT '{_timeout_raw}' in config.ini. Using {_REQUEST_TIMEOUT}.",
+            file=sys.stderr,
+        )
+        _timeout = _REQUEST_TIMEOUT
+    client = Groq(api_key=groq_api_key, timeout=_timeout)
+
+    # Retry the API call up to the config-driven maximum number of times
+    _retries_raw = config.get("MAX_RETRIES", str(_RETRY_MAX))
+    try:
+        retry_max = int(_retries_raw)
+    except (ValueError, TypeError):
+        print(
+            f"Invalid MAX_RETRIES '{_retries_raw}' in config.ini. Using {_RETRY_MAX}.",
+            file=sys.stderr,
+        )
+        retry_max = _RETRY_MAX
+    for attempt in range(1, retry_max + 1):
         # Attempt the API call and catch any exceptions
         try:
             # Send the request payload to the Groq API for completion
-            completion = client.chat.completions.create(**request_payload)
+            completion = client.chat.completions.create(**request_payload)  # type: ignore[arg-type]
 
             # Check if the completion or its choices list is empty or None
             if not completion or not completion.choices:
@@ -293,20 +367,24 @@ def get_words(image_path: str, words: int = 6) -> str:
                 # Return an empty string if the content is missing
                 return ""
 
-            # Return the AI-generated image description text
-            return completion.choices[0].message.content
+            # Get the AI-generated description and enforce the word limit
+            # (splitting by any non-alphabetic character)
+            description = completion.choices[0].message.content.strip()
+            desc_words = re.findall(r"[a-zA-Z]+", description)
+            if len(desc_words) > words:
+                description = " ".join(desc_words[:words])
+            return description
 
         # Catch any exception that occurs during the API call
         except Exception as exc:
             # Check if there are remaining retry attempts
-            if attempt < _RETRY_MAX:
+            if attempt < retry_max:
                 # Calculate the exponential backoff delay for this attempt
-                delay = _RETRY_BACKOFF_BASE ** attempt
+                delay = _RETRY_BACKOFF_BASE**attempt
                 # Print the retry warning message to stderr
                 print(
-                    f"API call failed (attempt {attempt}/{_RETRY_MAX}), "
-                    f"retrying in {delay:.1f}s: {exc}",
-                    file=__import__("sys").stderr,
+                    f"API call failed (attempt {attempt}/{retry_max}), retrying in {delay:.1f}s: {exc}",
+                    file=sys.stderr,
                 )
                 # Wait for the calculated backoff delay before retrying
                 time.sleep(delay)
@@ -314,8 +392,8 @@ def get_words(image_path: str, words: int = 6) -> str:
             else:
                 # Print the final failure message to stderr
                 print(
-                    f"API call failed after {_RETRY_MAX} attempts: {exc}",
-                    file=__import__("sys").stderr,
+                    f"API call failed after {retry_max} attempts: {exc}",
+                    file=sys.stderr,
                 )
 
     # Return an empty string if all retry attempts were exhausted

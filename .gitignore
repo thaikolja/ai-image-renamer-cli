@@ -102,7 +102,6 @@ dmypy.json
 .pyre/
 .pytype/
 cython_debug/
-docs/node_modules/
 
 # Editor folders
 .vscode/

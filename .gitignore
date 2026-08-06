@@ -7,6 +7,10 @@ Icon
 !README.md
 !CHANGELOG.md
 !CONTRIBUTING.md
+!docs/**/*.md
+docs/node_modules/
+docs/.vitepress/dist/
+docs/.vitepress/cache/
 ._*
 .DocumentRevisions-V100
 .fseventsd

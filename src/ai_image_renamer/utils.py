@@ -5,7 +5,7 @@ import os
 import re
 import sys
 import time
-from typing import Optional
+from typing import Any, Optional
 
 # Import package config module for user-defined settings
 from . import config
@@ -217,44 +217,71 @@ _RETRY_BACKOFF_BASE = 2.0
 # Set the API request timeout in seconds
 _REQUEST_TIMEOUT = 30.0
 
+# Providers handled by the OpenAI-compatible code path
+_OPENAI_COMPATIBLE_PROVIDERS = ("ollama", "openai")
 
-# Define the get_words function that sends an image to the Groq API
-# and returns an AI description
+
+# Define the get_words dispatcher that routes to the configured AI provider
 def get_words(
     image_path: str,
     words: int = 6,
     model: Optional[str] = None,
     api_key: Optional[str] = None,
+    provider: Optional[str] = None,
 ) -> str:
     """Generate a concise, SEO-friendly description for an image using AI.
 
-    Sends an image to the Groq multimodal API and receives
-    a short text description suitable for use as a filename.
+    Sends an image to the configured AI provider and receives a short text
+    description suitable for use as a filename.
 
-    The model, temperature, timeout, and retry count are read from config.ini
-    (with hardcoded fallbacks).  Includes automatic retry with exponential
-    backoff for transient failures.
+    Supported providers:
+    - "groq": hosted Groq API (requires GROQ_API_KEY)
+    - "ollama": local Ollama server via its OpenAI-compatible endpoint
+    - "openai": any OpenAI-compatible endpoint (LM Studio, vLLM, llama.cpp, ...)
+
+    The provider, model, temperature, timeout, and retry count are read from
+    config.ini (with hardcoded fallbacks). Includes automatic retry with
+    exponential backoff for transient failures.
 
     Args:
         image_path: Filesystem path to the image to analyze.
         words: Maximum number of words requested in the description (1-50).
-        model: Optional CLI override for the Groq model (takes priority over
+        model: Optional CLI override for the model (takes priority over
                config.ini and hardcoded default).
-        api_key: Optional CLI override for the Groq API key (takes priority
+        api_key: Optional CLI override for the API key (takes priority
                  over environment variable and config.ini).
+        provider: Optional CLI override for the provider ("groq", "ollama",
+                  or "openai"). Takes priority over config.ini.
 
     Returns:
         AI-generated description, or empty string on failure after retries.
 
     Raises:
-        RuntimeError: If GROQ_API_KEY is not set via any source.
+        RuntimeError: If required credentials/endpoints are not configured.
+        ValueError: If an unknown provider is given.
         FileNotFoundError: If image_path does not exist.
 
     """
+    # Provider priority: CLI param → config.ini
+    provider = provider or config.get("PROVIDER", "groq")
+
+    # Dispatch to the provider-specific implementation
+    if provider == "groq":
+        return _get_words_groq(image_path, words, model, api_key)
+    if provider in _OPENAI_COMPATIBLE_PROVIDERS:
+        return _get_words_openai_compatible(image_path, words, model, api_key, provider)
+    raise ValueError(f"Unknown provider '{provider}'. Choose from: groq, ollama, openai")
+
+
+def _get_words_groq(
+    image_path: str,
+    words: int,
+    model: Optional[str],
+    api_key: Optional[str],
+) -> str:
+    """Send the image to the Groq API and return an AI description."""
     # API key priority: CLI param → env var → config.ini
     groq_api_key = api_key or os.getenv("GROQ_API_KEY") or config.get("GROQ_API_KEY")
-    # Clamp word count to valid range as a safety net
-    words = max(1, min(50, words))
     # Check if the API key is set
     if not groq_api_key:
         # Raise a RuntimeError with setup instructions for the API key
@@ -264,6 +291,99 @@ def get_words(
             "Get a free key at: https://console.groq.com/keys"
         )
 
+    # Clamp word count to valid range as a safety net
+    words = max(1, min(50, words))
+
+    # Build the shared multimodal request messages
+    request_messages = _build_request_messages(image_path, words)
+
+    # Model priority: CLI param → GROQ_MODEL env var → config.ini
+    effective_model = model or os.getenv("GROQ_MODEL") or config.get("MODEL")
+
+    # Only include reasoning_effort for reasoning models (Qwen, GPT-OSS)
+    reasoning_effort: Optional[str] = config.get("REASONING_EFFORT")
+    if not (reasoning_effort and effective_model and ("qwen" in effective_model or "gpt-oss" in effective_model)):
+        reasoning_effort = None
+
+    request_payload = {
+        "model": effective_model,
+        "temperature": _parse_temperature(),
+        "reasoning_effort": reasoning_effort,
+        "stream": False,
+        "stop": None,
+        "messages": request_messages,
+    }
+
+    # Import the Groq client (lazy import to avoid requiring it at module import time)
+    from groq import Groq
+
+    # Create the Groq client with the API key and config-driven request timeout
+    client = Groq(api_key=groq_api_key, timeout=_parse_timeout())
+
+    # Call the API with retries and extract the description
+    completion = _call_chat_completions(client, request_payload, _parse_retries())
+    return _extract_description(completion, words)
+
+
+def _get_words_openai_compatible(
+    image_path: str,
+    words: int,
+    model: Optional[str],
+    api_key: Optional[str],
+    provider: str,
+) -> str:
+    """Send the image to an OpenAI-compatible endpoint (Ollama, LM Studio, ...)."""
+    # Clamp word count to valid range as a safety net
+    words = max(1, min(50, words))
+
+    # Resolve the endpoint, model, and API key for the chosen provider
+    if provider == "ollama":
+        base_url = config.get("OLLAMA_HOST", "http://localhost:11434/v1")
+        effective_model = model or config.get("OLLAMA_MODEL", "llava:latest")
+        effective_api_key = api_key or "ollama"
+    else:
+        base_url = config.get("OPENAI_API_BASE", "")
+        effective_model = model or config.get("OPENAI_MODEL", "")
+        effective_api_key = api_key or os.getenv("OPENAI_API_KEY") or config.get("OPENAI_API_KEY") or "local"
+
+    # Validate the required endpoint and model settings
+    if not base_url:
+        raise RuntimeError(
+            "OPENAI_API_BASE is not set. "
+            "Set OPENAI_API_BASE in ./config.ini (e.g. "
+            "OPENAI_API_BASE=http://localhost:1234/v1 for LM Studio)."
+        )
+    if not effective_model:
+        raise RuntimeError("OPENAI_MODEL is not set. Pass --model, or set OPENAI_MODEL in ./config.ini.")
+
+    # Import the OpenAI client (lazy import; requires the [local] extra)
+    try:
+        from openai import OpenAI
+    except ImportError:
+        raise RuntimeError(
+            "The 'openai' package is required for local LLM providers. "
+            'Install it with: pip install "ai-image-renamer[local]"'
+        )
+
+    # Build the shared multimodal request messages
+    request_messages = _build_request_messages(image_path, words)
+
+    request_payload = {
+        "model": effective_model,
+        "temperature": _parse_temperature(),
+        "messages": request_messages,
+    }
+
+    # Create the OpenAI-compatible client with the endpoint and timeout
+    client = OpenAI(api_key=effective_api_key, base_url=base_url, timeout=_parse_timeout())
+
+    # Call the API with retries and extract the description
+    completion = _call_chat_completions(client, request_payload, _parse_retries())
+    return _extract_description(completion, words)
+
+
+def _build_request_messages(image_path: str, words: int) -> list:
+    """Encode the image and build the multimodal request messages."""
     # Encode the image file to base64 for API transmission
     encoded_image = encode_image(image_path)
     # Guess the MIME type of the image for the data URL prefix
@@ -273,7 +393,7 @@ def get_words(
     word_label = "word" if words == 1 else "words"
 
     # Build the request messages structure with the text prompt and image data URL
-    request_messages = [
+    return [
         {
             "role": "user",
             "content": [
@@ -295,87 +415,56 @@ def get_words(
         }
     ]
 
-    # Build the full request payload: model priority: CLI → env var → config.ini → hardcoded
+
+def _parse_temperature() -> float:
+    """Parse TEMPERATURE from config.ini, falling back to 1.0."""
     _temp_raw = config.get("TEMPERATURE", "1.0")
     try:
-        _temperature = float(_temp_raw)
+        return float(_temp_raw)
     except (ValueError, TypeError):
         print(
             f"Invalid TEMPERATURE '{_temp_raw}' in config.ini. Using 1.0.",
             file=sys.stderr,
         )
-        _temperature = 1.0
+        return 1.0
 
-    # Model priority: CLI param → GROQ_MODEL env var → config.ini
-    effective_model = model or os.getenv("GROQ_MODEL") or config.get("MODEL")
 
-    # Only include reasoning_effort for reasoning models (Qwen, GPT-OSS)
-    reasoning_effort: Optional[str] = config.get("REASONING_EFFORT")
-    if not (reasoning_effort and effective_model and ("qwen" in effective_model or "gpt-oss" in effective_model)):
-        reasoning_effort = None
-
-    request_payload = {
-        "model": effective_model,
-        "temperature": _temperature,
-        "reasoning_effort": reasoning_effort,
-        "stream": False,
-        "stop": None,
-        "messages": request_messages,
-    }
-
-    # Import the Groq client (lazy import to avoid requiring it at module import time)
-    from groq import Groq
-
-    # Create the Groq client with the API key and config-driven request timeout
+def _parse_timeout() -> float:
+    """Parse TIMEOUT from config.ini, falling back to the module default."""
     _timeout_raw = config.get("TIMEOUT", str(_REQUEST_TIMEOUT))
     try:
-        _timeout = float(_timeout_raw)
+        return float(_timeout_raw)
     except (ValueError, TypeError):
         print(
             f"Invalid TIMEOUT '{_timeout_raw}' in config.ini. Using {_REQUEST_TIMEOUT}.",
             file=sys.stderr,
         )
-        _timeout = _REQUEST_TIMEOUT
-    client = Groq(api_key=groq_api_key, timeout=_timeout)
+        return _REQUEST_TIMEOUT
 
-    # Retry the API call up to the config-driven maximum number of times
+
+def _parse_retries() -> int:
+    """Parse MAX_RETRIES from config.ini, falling back to the module default."""
     _retries_raw = config.get("MAX_RETRIES", str(_RETRY_MAX))
     try:
-        retry_max = int(_retries_raw)
+        return int(_retries_raw)
     except (ValueError, TypeError):
         print(
             f"Invalid MAX_RETRIES '{_retries_raw}' in config.ini. Using {_RETRY_MAX}.",
             file=sys.stderr,
         )
-        retry_max = _RETRY_MAX
+        return _RETRY_MAX
+
+
+def _call_chat_completions(client: Any, request_payload: dict, retry_max: int) -> Any:
+    """Call the chat completions API, retrying with exponential backoff.
+
+    Returns the raw completion object, or None if all retries were exhausted.
+    """
     for attempt in range(1, retry_max + 1):
         # Attempt the API call and catch any exceptions
         try:
-            # Send the request payload to the Groq API for completion
-            completion = client.chat.completions.create(**request_payload)  # type: ignore[arg-type]
-
-            # Check if the completion or its choices list is empty or None
-            if not completion or not completion.choices:
-                # Return an empty string if no valid response was received
-                return ""
-            # Check if the first choice has no message object
-            if not completion.choices[0].message:
-                # Return an empty string if the message is missing
-                return ""
-            # Check if the message content is empty or None
-            if not completion.choices[0].message.content:
-                # Return an empty string if the content is missing
-                return ""
-
-            # Get the AI-generated description and enforce the word limit
-            # (splitting by any non-alphabetic character)
-            description = completion.choices[0].message.content.strip()
-            desc_words = re.findall(r"[a-zA-Z]+", description)
-            if len(desc_words) > words:
-                description = " ".join(desc_words[:words])
-            return description
-
-        # Catch any exception that occurs during the API call
+            # Send the request payload to the API for completion
+            return client.chat.completions.create(**request_payload)
         except Exception as exc:
             # Check if there are remaining retry attempts
             if attempt < retry_max:
@@ -388,7 +477,6 @@ def get_words(
                 )
                 # Wait for the calculated backoff delay before retrying
                 time.sleep(delay)
-            # Handle the case when all retry attempts have been exhausted
             else:
                 # Print the final failure message to stderr
                 print(
@@ -396,5 +484,26 @@ def get_words(
                     file=sys.stderr,
                 )
 
-    # Return an empty string if all retry attempts were exhausted
-    return ""
+    # Return None if all retry attempts were exhausted
+    return None
+
+
+def _extract_description(completion: Any, words: int) -> str:
+    """Extract the AI description from a completion and enforce the word limit."""
+    # Check if the completion or its choices list is empty or None
+    if not completion or not completion.choices:
+        return ""
+    # Check if the first choice has no message object
+    if not completion.choices[0].message:
+        return ""
+    # Check if the message content is empty or None
+    if not completion.choices[0].message.content:
+        return ""
+
+    # Get the AI-generated description and enforce the word limit
+    # (splitting by any non-alphabetic character)
+    description = completion.choices[0].message.content.strip()
+    desc_words = re.findall(r"[a-zA-Z]+", description)
+    if len(desc_words) > words:
+        description = " ".join(desc_words[:words])
+    return description

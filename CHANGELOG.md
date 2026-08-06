@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file. The format 
 
 ## v1
 
+### v1.4.0
+
+#### Added
+
+* **Local LLM Support:** New `PROVIDER` abstraction with three backends: `groq` (hosted), `ollama` (local), and `openai` (any OpenAI-compatible endpoint)
+* **Ollama Provider:** Run the tool fully offline against a local Ollama server via its OpenAI-compatible endpoint (`OLLAMA_HOST`, `OLLAMA_MODEL` config keys)
+* **OpenAI-Compatible Provider:** Support for LM Studio, vLLM, llama.cpp, and any server speaking the OpenAI Chat Completions API (`OPENAI_API_BASE`, `OPENAI_API_KEY`, `OPENAI_MODEL` config keys)
+* **`--provider` CLI Flag:** Per-invocation provider override with `choices=["groq", "ollama", "openai"]`
+* **Local Extra:** New optional dependency group `pip install "ai-image-renamer[local]"` providing the `openai` package
+* **VitePress Documentation:** Full static documentation site under `docs/` covering installation, configuration, providers, CLI, and API
+* **GitHub Actions:** Automated VitePress build and GitHub Pages deployment on push to `main`
+
+#### Changed
+
+* **`get_words()`:** Now accepts a `provider` keyword argument; dispatches to provider-specific implementations with shared retry/description logic
+* **Utils Refactor:** Extracted shared helpers (`_build_request_messages`, `_parse_temperature`, `_parse_timeout`, `_parse_retries`, `_call_chat_completions`, `_extract_description`) used by all providers
+* **`ImageRenamer`:** Forwards the `provider` argument to `get_words()`
+
 ### v1.3.0
 
 #### Added

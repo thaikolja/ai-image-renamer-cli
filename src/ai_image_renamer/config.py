@@ -27,8 +27,14 @@ import sys
 
 # Hardcoded defaults — used when no config.ini exists and no env var is set
 _DEFAULTS = {
+    "PROVIDER": "groq",
     "GROQ_API_KEY": "",
     "MODEL": "qwen/qwen3.6-27b",
+    "OLLAMA_HOST": "http://localhost:11434/v1",
+    "OLLAMA_MODEL": "llava:latest",
+    "OPENAI_API_BASE": "",
+    "OPENAI_API_KEY": "",
+    "OPENAI_MODEL": "",
     "TEMPERATURE": "1.0",
     "TIMEOUT": "30",
     "MAX_RETRIES": "3",
@@ -46,13 +52,37 @@ _TEMPLATE = """# AI Image Renamer — Configuration
 # This file sets defaults for rename_images commands.
 # CLI arguments (e.g. -w) always override these defaults.
 
-# Your Groq API key (required)
+# Which AI backend to use: groq, ollama, or openai
+# - groq:   hosted Groq API (requires GROQ_API_KEY)
+# - ollama: local Ollama server (see https://ollama.com)
+# - openai: any OpenAI-compatible endpoint (LM Studio, vLLM, llama.cpp, ...)
+PROVIDER=groq
+
+# Your Groq API key (required for PROVIDER=groq)
 # Get a free key at: https://console.groq.com/keys
 GROQ_API_KEY=
 
 # The Groq model to use for image analysis
 # Browse available models: https://console.groq.com/docs/models
 MODEL=qwen/qwen3.6-27b
+
+# Ollama server (OpenAI-compatible endpoint, required for PROVIDER=ollama)
+# Start it with: ollama serve
+OLLAMA_HOST=http://localhost:11434/v1
+
+# The Ollama vision model to use for image analysis
+# Pull a model first, e.g.: ollama pull llava
+OLLAMA_MODEL=llava:latest
+
+# OpenAI-compatible endpoint (required for PROVIDER=openai)
+# e.g. http://localhost:1234/v1 for LM Studio, http://localhost:8000/v1 for vLLM
+OPENAI_API_BASE=
+
+# API key for the OpenAI-compatible endpoint (if required)
+OPENAI_API_KEY=
+
+# Model name for the OpenAI-compatible endpoint
+OPENAI_MODEL=
 
 # Creativity / randomness of the AI output (0.0 – 2.0)
 TEMPERATURE=1.0

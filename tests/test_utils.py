@@ -12,6 +12,9 @@ sys.modules.setdefault('filetype', _MOCK_FILETYPE)
 _MOCK_GROQ = MagicMock()
 sys.modules.setdefault('groq', _MOCK_GROQ)
 
+_MOCK_OPENAI = MagicMock()
+sys.modules.setdefault('openai', _MOCK_OPENAI)
+
 # Import standard library modules for testing, mocking, file operations, and temp files
 import unittest
 from unittest.mock import patch
@@ -229,6 +232,138 @@ class TestUtils(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             # Call get_words which should raise due to missing API key
             utils.get_words("test_image.jpg", words=6)
+
+    # Mock encode_image to return a fixed encoded string
+    @patch('ai_image_renamer.utils.encode_image')
+    # Mock filetype.guess to control MIME type detection
+    @patch('filetype.guess')
+    # Mock the OpenAI client to avoid real API calls
+    @patch('openai.OpenAI')
+    # Mock config.get to provide the provider settings
+    @patch('ai_image_renamer.utils.config.get')
+    def test_get_words_ollama_success(self, mock_config_get, mock_openai, mock_guess, mock_encode_image):
+        """
+        Test get_words with the ollama provider and a successful API call.
+        """
+        # Configure the mock to return a fixed encoded string
+        mock_encode_image.return_value = "encoded_image_string"
+        # Configure the mock to return a PNG MIME type
+        mock_guess.return_value = MagicMock(mime='image/png')
+        # Provide Ollama settings via config mock
+        mock_config_get.side_effect = lambda key, default=None: {
+            "PROVIDER": "ollama",
+            "OLLAMA_HOST": "http://localhost:11434/v1",
+            "OLLAMA_MODEL": "llava:latest",
+        }.get(key, default)
+        # Create a mock completion object
+        mock_completion = MagicMock()
+        mock_completion.choices[0].message.content = "A test description"
+        # Configure the OpenAI client mock to return the completion
+        mock_openai.return_value.chat.completions.create.return_value = mock_completion
+        # Call get_words with the ollama provider
+        result = utils.get_words("test_image.jpg", words=8)
+        # Assert that the result matches the mocked description
+        self.assertEqual(result, "A test description")
+        # Capture the kwargs passed to the OpenAI client constructor
+        client_kwargs = mock_openai.call_args.kwargs
+        # Assert that the Ollama endpoint is used
+        self.assertEqual(client_kwargs["base_url"], "http://localhost:11434/v1")
+        # Assert that the dummy Ollama API key is used
+        self.assertEqual(client_kwargs["api_key"], "ollama")
+        # Capture the kwargs passed to the API create call
+        create_kwargs = mock_openai.return_value.chat.completions.create.call_args.kwargs
+        # Assert that the correct model name was used
+        self.assertEqual(create_kwargs["model"], "llava:latest")
+        # Assert that the vision URL includes the correct MIME type and encoded image
+        self.assertEqual(
+            create_kwargs["messages"][0]["content"][1]["image_url"]["url"],
+            "data:image/png;base64,encoded_image_string",
+        )
+
+    # Mock encode_image to return a fixed encoded string
+    @patch('ai_image_renamer.utils.encode_image')
+    # Mock filetype.guess to control MIME type detection
+    @patch('filetype.guess')
+    # Mock the OpenAI client to avoid real API calls
+    @patch('openai.OpenAI')
+    # Mock config.get to provide the provider settings
+    @patch('ai_image_renamer.utils.config.get')
+    def test_get_words_openai_success(self, mock_config_get, mock_openai, mock_guess, mock_encode_image):
+        """
+        Test get_words with the openai provider and a successful API call.
+        """
+        # Configure the mock to return a fixed encoded string
+        mock_encode_image.return_value = "encoded_image_string"
+        # Configure the mock to return a JPEG MIME type
+        mock_guess.return_value = MagicMock(mime='image/jpeg')
+        # Provide OpenAI-compatible settings via config mock
+        mock_config_get.side_effect = lambda key, default=None: {
+            "PROVIDER": "openai",
+            "OPENAI_API_BASE": "http://localhost:1234/v1",
+            "OPENAI_MODEL": "my-vision-model",
+            "OPENAI_API_KEY": "local-key",
+        }.get(key, default)
+        # Create a mock completion object
+        mock_completion = MagicMock()
+        mock_completion.choices[0].message.content = "A test description"
+        # Configure the OpenAI client mock to return the completion
+        mock_openai.return_value.chat.completions.create.return_value = mock_completion
+        # Call get_words with the openai provider
+        result = utils.get_words("test_image.jpg", words=8)
+        # Assert that the result matches the mocked description
+        self.assertEqual(result, "A test description")
+        # Capture the kwargs passed to the OpenAI client constructor
+        client_kwargs = mock_openai.call_args.kwargs
+        # Assert that the custom endpoint is used
+        self.assertEqual(client_kwargs["base_url"], "http://localhost:1234/v1")
+        # Assert that the configured API key is used
+        self.assertEqual(client_kwargs["api_key"], "local-key")
+        # Capture the kwargs passed to the API create call
+        create_kwargs = mock_openai.return_value.chat.completions.create.call_args.kwargs
+        # Assert that the correct model name was used
+        self.assertEqual(create_kwargs["model"], "my-vision-model")
+
+    # Mock config.get to provide the provider settings
+    @patch('ai_image_renamer.utils.config.get')
+    def test_get_words_ollama_missing_openai_package(self, mock_config_get):
+        """
+        Test that get_words raises RuntimeError when openai is not installed.
+        """
+        # Provide Ollama settings via config mock
+        mock_config_get.side_effect = lambda key, default=None: {
+            "PROVIDER": "ollama",
+            "OLLAMA_HOST": "http://localhost:11434/v1",
+            "OLLAMA_MODEL": "llava:latest",
+        }.get(key, default)
+        # Simulate the openai package being unavailable
+        with patch.dict(sys.modules, {"openai": None}):
+            # Assert that calling get_words raises RuntimeError
+            with self.assertRaises(RuntimeError):
+                utils.get_words("test_image.jpg", words=6)
+
+    # Mock config.get to provide the provider settings
+    @patch('ai_image_renamer.utils.config.get')
+    def test_get_words_openai_missing_base_url(self, mock_config_get):
+        """
+        Test that get_words raises RuntimeError when OPENAI_API_BASE is missing.
+        """
+        # Provide provider settings with no API base
+        mock_config_get.side_effect = lambda key, default=None: {
+            "PROVIDER": "openai",
+            "OPENAI_MODEL": "my-vision-model",
+        }.get(key, default)
+        # Assert that calling get_words raises RuntimeError
+        with self.assertRaises(RuntimeError):
+            utils.get_words("test_image.jpg", words=6)
+
+    # Define a test method for an unknown provider
+    def test_get_words_unknown_provider_raises_value_error(self):
+        """
+        Test that get_words raises ValueError for an unknown provider.
+        """
+        # Assert that calling get_words with an unknown provider raises ValueError
+        with self.assertRaises(ValueError):
+            utils.get_words("test_image.jpg", words=6, provider="unknown")
 
     # Define a test method for basic path sanitization
     def test_sanitize_image_path_basic(self):

@@ -13,7 +13,7 @@
 #  @license     MIT
 #  @date        2026
 #  @website     https://docs.kolja-nolte.com/ai-image-renamer
-#  @repository  https://gitlab.com/thaikolja/ai-image-renamer
+#  @repository  https://gitlab.com/thaikolja/ai-image-renamer-cli
 
 """Dev entry point that adds src/ to sys.path then delegates to the CLI."""
 

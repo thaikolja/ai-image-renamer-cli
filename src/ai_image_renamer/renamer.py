@@ -137,12 +137,13 @@ class ImageRenamer:
             # Inform the user that processing has started for this image
             print(f"Processing {path}...", file=sys.stderr)
 
-            # Fetch AI-generated content description from the Groq API
+            # Fetch AI-generated content description from the configured AI provider
             content = utils.get_words(
                 path,
                 self.args.words,
                 model=getattr(self.args, "model", None),
                 api_key=getattr(self.args, "api_key", None),
+                provider=getattr(self.args, "provider", None),
             )
 
             # Check if the API returned meaningful content

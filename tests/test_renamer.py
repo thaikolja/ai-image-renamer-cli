@@ -279,6 +279,7 @@ class TestRenamer(unittest.TestCase):
         # Ensure optional CLI args default to None (as argparse would)
         args.model = None
         args.api_key = None
+        args.provider = None
 
         # Configure the mock to report the image as valid
         mock_utils.verify_image_file.return_value = True
@@ -292,7 +293,40 @@ class TestRenamer(unittest.TestCase):
 
         # Verify get_words received the correct image path and word count
         mock_utils.get_words.assert_called_once_with(
-            "test_image.jpg", 3, model=None, api_key=None
+            "test_image.jpg", 3, model=None, api_key=None, provider=None
+        )
+
+    # Mock the utils module used by the renamer
+    @patch('ai_image_renamer.renamer.utils')
+    # Mock os.rename to prevent actual filesystem changes
+    @patch('os.rename')
+    # Define a test method for verifying the provider parameter is forwarded
+    def test_provider_parameter_passed_to_get_words(self, mock_os_rename, mock_utils):
+        """Test that the provider parameter is correctly passed to get_words."""
+        # Create a mock object to simulate the CLI argument namespace
+        args = MagicMock()
+        # Set the image paths list to a single test file
+        args.image_paths = ["test_image.jpg"]
+        # Set the desired AI description word count
+        args.words = 6
+        args.model = None
+        args.api_key = None
+        # Set the provider to ollama
+        args.provider = "ollama"
+
+        # Configure the mock to report the image as valid
+        mock_utils.verify_image_file.return_value = True
+        # Configure get_words to return a short description
+        mock_utils.get_words.return_value = "short desc"
+        # Configure the mock to return a sanitized destination path
+        mock_utils.sanitize_image_path.return_value = "short-desc.jpg"
+
+        # Instantiate ImageRenamer, which triggers the rename pipeline
+        renamer.ImageRenamer(args)
+
+        # Verify get_words received the correct provider
+        mock_utils.get_words.assert_called_once_with(
+            "test_image.jpg", 6, model=None, api_key=None, provider="ollama"
         )
 
 

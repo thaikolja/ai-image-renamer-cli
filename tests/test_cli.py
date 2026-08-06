@@ -99,6 +99,40 @@ class TestCLI(unittest.TestCase):
     @patch('ai_image_renamer.cli.renamer.ImageRenamer')
     # Mock the load_dotenv function
     @patch('dotenv.load_dotenv')
+    # Define test for custom provider option
+    def test_main_with_provider_option(self, mock_load_dotenv, mock_renamer):
+        """
+        Test main() with custom provider option.
+        """
+        # Arrange: Set up command line with --provider option
+        with patch('sys.argv', ['rename_images', '--provider', 'ollama', 'image.jpg']):
+            # Act: Call main
+            cli.main()
+
+            # Assert: Check provider parameter
+            call_args = mock_renamer.call_args[0][0]
+            # Verify the provider was parsed correctly
+            self.assertEqual(call_args.provider, 'ollama')
+
+    # Mock the ImageRenamer class
+    @patch('ai_image_renamer.cli.renamer.ImageRenamer')
+    # Mock the load_dotenv function
+    @patch('dotenv.load_dotenv')
+    # Define test for invalid provider value
+    def test_main_invalid_provider_raises_error(self, mock_load_dotenv, mock_renamer):
+        """
+        Test that invalid provider value raises SystemExit.
+        """
+        # Arrange: Set up command line with invalid provider
+        with patch('sys.argv', ['rename_images', '--provider', 'invalid', 'image.jpg']):
+            # Act & Assert: Should raise SystemExit due to choices validation
+            with self.assertRaises(SystemExit):
+                cli.main()
+
+    # Mock the ImageRenamer class
+    @patch('ai_image_renamer.cli.renamer.ImageRenamer')
+    # Mock the load_dotenv function
+    @patch('dotenv.load_dotenv')
     # Define test for default word count
     def test_main_default_words(self, mock_load_dotenv, mock_renamer):
         """

@@ -2,6 +2,8 @@
 
 The `rename_images` command is the entry point to the tool.
 
+Settings are read from `~/.config/ai-image-renamer-cli/.env`, or from `$XDG_CONFIG_HOME/ai-image-renamer-cli/.env` when `XDG_CONFIG_HOME` is set.
+
 ## Synopsis
 
 ```
@@ -68,6 +70,7 @@ rename_images --api-key gsk_xxx photo.jpg
 AI model for this invocation.
 
 - Overrides `GROQ_MODEL` env var / `MODEL` config key for Groq
+- On Groq, only `qwen/qwen3.8-27b` accepts images
 - Overrides `OLLAMA_MODEL` for Ollama and `OPENAI_MODEL` for OpenAI-compatible
 
 ```bash

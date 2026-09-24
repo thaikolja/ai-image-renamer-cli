@@ -30,20 +30,31 @@ See the [Providers guide](/guide/providers) for full setup instructions for each
 
 ## 3. Configure
 
-On first run, a commented `.env` file is auto-generated at `~/.config/ai-image-renamer-cli/.env`. Open it and set at minimum the API key for your provider:
+Settings live in an editable file outside the install directory:
+
+```text
+~/.config/ai-image-renamer-cli/.env
+```
+
+When `XDG_CONFIG_HOME` is set, the file is `$XDG_CONFIG_HOME/ai-image-renamer-cli/.env`. The first run creates it (mode `0600`). pip and pipx upgrades leave it in place.
+
+Open it and set the API key and the Groq vision model:
 
 ```ini
 PROVIDER=groq
 GROQ_API_KEY=gsk_your_api_key_here
+MODEL=qwen/qwen3.8-27b
 ```
 
-Alternatively, export the key. It overrides the config file. The `export` is required; a bare assignment in `.zshrc` is visible to `echo` and is not inherited by the program:
+On Groq, only `qwen/qwen3.8-27b` accepts images. Other Groq models are text-only and cannot rename a picture. Local providers use `OLLAMA_MODEL` or `OPENAI_MODEL` instead.
+
+You can also export the key. An exported value overrides the file. The `export` is required; a bare assignment in `.zshrc` is visible to `echo` and is not inherited by the program:
 
 ```bash
 export GROQ_API_KEY="your-key-here"
 ```
 
-Everything else — model, temperature, word count, timeouts — has sensible defaults. See [Configuration](/guide/configuration) for the full list.
+Temperature, word count, and timeouts have defaults. See [Configuration](/guide/configuration) for the full list.
 
 ## 4. Rename your first image
 

@@ -93,6 +93,9 @@ REASONING_EFFORT=none
 ### `PROVIDER`
 The AI backend. `groq`, `ollama`, or `openai`. See the [Providers guide](/guide/providers).
 
+### `MODEL`
+Groq model id. Only [`qwen/qwen3.8-27b`](https://console.groq.com/docs/model/qwen/qwen3.8-27b) accepts images. The default is that id. A different Groq model prints a warning and cannot describe a picture. This key is read from `~/.config/ai-image-renamer-cli/.env`.
+
 ### `TEMPERATURE`
 Controls output randomness (0.0 – 2.0). Lower values produce more deterministic, focused keywords; higher values produce more varied descriptions. Default `1.0`.
 

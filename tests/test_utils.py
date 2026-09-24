@@ -66,7 +66,7 @@ class TestUtils(IsolatedTestCase):
         """
         # Build the path to the test image in the assets directory
         test_image_path = os.path.join(
-            os.path.dirname(__file__), '..', 'assets', 'test-image.jpg'
+            os.path.dirname(__file__), '..', 'assets', 'test-image-small.jpg'
         )
         # Skip the test if the asset file does not exist
         if not os.path.exists(test_image_path):
@@ -517,7 +517,7 @@ class TestUtils(IsolatedTestCase):
         """
         # Build the path to the test image in the assets directory
         test_image_path = os.path.join(
-            os.path.dirname(__file__), '..', 'assets', 'test-image.jpg'
+            os.path.dirname(__file__), '..', 'assets', 'test-image-small.jpg'
         )
         # Skip the test if the asset file does not exist
         if not os.path.exists(test_image_path):

@@ -18,9 +18,14 @@ except ImportError:
     # Import CLI after adjusting the Python path
     from ai_image_renamer import cli
 
+try:
+    from tests.base import IsolatedTestCase
+except ImportError:
+    from base import IsolatedTestCase
+
 
 # Define the test case class for CLI tests
-class TestCLI(unittest.TestCase):
+class TestCLI(IsolatedTestCase):
     """
     Unit tests for the command-line interface functions.
 
@@ -147,6 +152,22 @@ class TestCLI(unittest.TestCase):
             call_args = mock_renamer.call_args[0][0]
             # Verify the default word count value
             self.assertEqual(call_args.words, 6)
+
+    @patch('ai_image_renamer.cli.renamer.ImageRenamer')
+    @patch('dotenv.load_dotenv')
+    def test_main_reads_word_count_from_user_config(self, mock_load_dotenv, mock_renamer):
+        """Word-count default comes from the user config file, not the working directory."""
+        path = cli.config.config_path()
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w', encoding='utf-8') as handle:
+            handle.write('DEFAULT_WORD_COUNT=4\n')
+        cli.config.clear_cache()
+
+        with patch('sys.argv', ['rename_images', 'image.jpg']):
+            cli.main()
+
+        self.assertEqual(mock_renamer.call_args[0][0].words, 4)
+        mock_load_dotenv.assert_called_once_with(dotenv_path=path, override=False)
 
     # Define test for missing image paths
     def test_main_no_images_raises_error(self):
@@ -279,8 +300,11 @@ class TestCLI(unittest.TestCase):
             # Act: Call main
             cli.main()
 
-            # Assert: load_dotenv should be called once
-            mock_load_dotenv.assert_called_once()
+            # Assert: load_dotenv reads only the user config and keeps exported vars
+            mock_load_dotenv.assert_called_once_with(
+                dotenv_path=cli.config.config_path(),
+                override=False,
+            )
 
 
 # Check if this script is executed directly

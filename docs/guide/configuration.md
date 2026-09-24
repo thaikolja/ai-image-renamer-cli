@@ -1,17 +1,23 @@
 # Configuration
 
-AI Image Renamer is configured through a `config.ini` file in the current working directory.
+AI Image Renamer is configured through an editable `.env` file in your user config directory:
+
+```text
+~/.config/ai-image-renamer-cli/.env
+```
+
+When `XDG_CONFIG_HOME` is set, the file is `$XDG_CONFIG_HOME/ai-image-renamer-cli/.env` instead. The install location used by pip or pipx does not contain this file, so upgrades do not replace your settings.
 
 ## How configuration works
 
-1. On first run, a commented `config.ini` is **auto-generated** in the current directory
+1. On first run, a commented `.env` is **auto-generated** in that directory (mode `0600`)
 2. You edit it to set your preferences
 3. Values are read on every invocation
 
 **Priority order** (highest wins):
 
 ```
-CLI flags → environment variables → config.ini → built-in defaults
+CLI flags → exported environment variables → user config file → built-in defaults
 ```
 
 ::: warning
@@ -19,7 +25,7 @@ CLI arguments (e.g. `-w 3`) always override config file values.
 :::
 
 ::: danger Security
-Add `config.ini` to your `.gitignore` — it may contain your API key. Never commit it.
+The file lives outside the repository and can hold your API key. It is created so only your user can read it. Do not commit a copy.
 :::
 
 ## Environment variables
@@ -32,7 +38,7 @@ Some values can also be set via environment variables:
 | `GROQ_MODEL` | `MODEL` in config | Used by the `groq` provider |
 | `OPENAI_API_KEY` | `OPENAI_API_KEY` in config | Used by the `openai` provider |
 
-Environment variables can be exported in your shell profile or placed in a `.env` file (loaded automatically via `python-dotenv`).
+Export variables from your shell profile. A line like `GROQ_API_KEY=...` in `.zshrc` is visible to `echo` and is not inherited by the program; use `export GROQ_API_KEY=...`. The user config file is also loaded with `python-dotenv`, and it does not replace variables that are already exported.
 
 ## Full config reference
 
@@ -46,7 +52,7 @@ PROVIDER=groq
 GROQ_API_KEY=
 
 # The Groq model to use for image analysis
-MODEL=qwen/qwen3.6-27b
+MODEL=qwen/qwen3.8-27b
 
 # Ollama server (OpenAI-compatible endpoint)
 OLLAMA_HOST=http://localhost:11434/v1
@@ -104,4 +110,4 @@ Only applies to reasoning models (Qwen, GPT-OSS) on Groq. Setting `none` suppres
 
 ## Auto-generated template
 
-The generated `config.ini` is written by the package itself. If you delete it, a fresh commented template is created on the next run. The template always reflects the newest options, so it's safe to regenerate and diff.
+The generated `.env` file is written by the package itself. If you delete it, a fresh commented template is created on the next run. The template always reflects the newest options, so it's safe to regenerate and diff. A `config.ini` in the working directory is not read.

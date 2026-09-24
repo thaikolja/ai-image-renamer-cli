@@ -85,7 +85,7 @@ When you change behavior, update:
 Open an issue with:
 
 - The exact command you ran
-- Your `config.ini` (with the API key redacted!)
+- Your `~/.config/ai-image-renamer-cli/.env` (with the API key redacted!)
 - The provider and model used
 - Full error output
 

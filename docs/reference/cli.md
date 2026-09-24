@@ -33,7 +33,7 @@ The CLI processes at most **3 images** per invocation. Excess images are truncat
 Number of words in the generated filename.
 
 - Range: `1` – `50`
-- Default: `DEFAULT_WORD_COUNT` from config.ini (falls back to `6`)
+- Default: `DEFAULT_WORD_COUNT` from the user config file (falls back to `6`)
 
 ```bash
 rename_images -w 3 cat.jpg   # → orange-cat-sleeping.jpg
@@ -44,7 +44,7 @@ rename_images -w 3 cat.jpg   # → orange-cat-sleeping.jpg
 AI backend to use for this invocation.
 
 - Choices: `groq`, `ollama`, `openai`
-- Default: `PROVIDER` from config.ini (falls back to `groq`)
+- Default: `PROVIDER` from the user config file (falls back to `groq`)
 
 ```bash
 rename_images --provider ollama photo.jpg
@@ -55,7 +55,7 @@ rename_images --provider openai --model my-vision-model photo.jpg
 
 API key for this invocation.
 
-- Overrides the `GROQ_API_KEY` environment variable and config.ini
+- Overrides the exported `GROQ_API_KEY` environment variable and the user config file
 - Applies to the `groq` provider; Ollama uses a built-in dummy key
 - Get a free Groq key at https://console.groq.com/keys
 
@@ -71,7 +71,7 @@ AI model for this invocation.
 - Overrides `OLLAMA_MODEL` for Ollama and `OPENAI_MODEL` for OpenAI-compatible
 
 ```bash
-rename_images --model qwen/qwen3.6-27b photo.jpg
+rename_images --model qwen/qwen3.8-27b photo.jpg
 rename_images --provider ollama --model minicpm-v photo.jpg
 ```
 
@@ -81,7 +81,7 @@ Display the version and exit.
 
 ```bash
 rename_images -v
-# rename_images 1.4.0
+# rename_images 1.5.0
 ```
 
 ### `--help`, `-h`

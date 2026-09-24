@@ -20,7 +20,7 @@ from importlib.metadata import PackageNotFoundError, version
 
 # Package metadata constants
 _PACKAGE_NAME = "ai-image-renamer"
-_FALLBACK_VERSION = "1.4.0"
+_FALLBACK_VERSION = "1.5.0"
 
 # Try to fetch version from installed package metadata
 try:

@@ -30,14 +30,14 @@ See the [Providers guide](/guide/providers) for full setup instructions for each
 
 ## 3. Configure
 
-On first run, a commented `config.ini` is auto-generated in your current working directory. Open it and set at minimum the API key for your provider:
+On first run, a commented `.env` file is auto-generated at `~/.config/ai-image-renamer-cli/.env`. Open it and set at minimum the API key for your provider:
 
 ```ini
 PROVIDER=groq
 GROQ_API_KEY=gsk_your_api_key_here
 ```
 
-Alternatively, set the key as an environment variable:
+Alternatively, export the key. It overrides the config file. The `export` is required; a bare assignment in `.zshrc` is visible to `echo` and is not inherited by the program:
 
 ```bash
 export GROQ_API_KEY="your-key-here"

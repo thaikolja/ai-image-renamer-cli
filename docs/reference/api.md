@@ -18,7 +18,7 @@ from ai_image_renamer import (
 
 ### `__version__`
 
-The installed package version. Falls back to `1.4.0` when package metadata is unavailable (e.g. running from a source checkout).
+The installed package version. Falls back to `1.5.0` when package metadata is unavailable (e.g. running from a source checkout).
 
 ### `verify_image_file(image_path: str) -> bool`
 
@@ -98,10 +98,12 @@ The CLI entry point. Parses `sys.argv`, expands glob patterns, caps at 3 images,
 
 | Function | Description |
 |----------|-------------|
-| `get_config()` | Loads `config.ini` from CWD (auto-generates if missing), merges with defaults, caches the result |
+| `config_path()` | `~/.config/ai-image-renamer-cli/.env`, or under `$XDG_CONFIG_HOME` when that variable is set |
+| `get_config()` | Loads that file (auto-generates if missing), merges defaults, then applies exported environment variables, and caches the result |
+| `load_environment()` | Loads the same file with `python-dotenv` without overriding variables already exported |
 | `get(key, default=None)` | Convenience accessor for single config values |
 
-Internal helpers: `_get_config_path()`, `_generate_config()`, `_parse_config_file()`.
+Internal helpers: `config_dir()`, `ensure_config_file()`, `_parse_config_file()`, `_overlay_environment()`.
 
 ### `ai_image_renamer.utils` (private helpers)
 

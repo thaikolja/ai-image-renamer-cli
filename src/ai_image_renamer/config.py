@@ -13,23 +13,40 @@
 #  @website     https://docs.kolja-nolte.com/ai-image-renamer
 #  @repository  https://gitlab.com/thaikolja/ai-image-renamer
 
-"""Configuration management for AI Image Renamer.
+"""User configuration for AI Image Renamer.
 
-Reads a config.ini file from the current working directory.
-If none exists, a commented template is auto-generated so users
-can see all available options immediately.
+Settings live in an editable ``.env`` file under the user config directory:
 
-CLI arguments (e.g. -w) always override config values.
+    $XDG_CONFIG_HOME/ai-image-renamer-cli/.env
+
+When ``XDG_CONFIG_HOME`` is unset, that path is:
+
+    ~/.config/ai-image-renamer-cli/.env
+
+The file is created on first use and is not inside the pip or pipx install,
+so edits survive upgrades. Command-line flags win, then exported environment
+variables, then this file, then the built-in defaults.
+
+A shell assignment such as ``GROQ_API_KEY=...`` in ``.zshrc`` is visible to
+``echo`` but is not copied into child processes. Only ``export GROQ_API_KEY``
+reaches this program.
 """
 
 import os
 import sys
 
-# Hardcoded defaults — used when no config.ini exists and no env var is set
+# Directory and file name of the editable user config.
+_APP_DIR_NAME = "ai-image-renamer-cli"
+_CONFIG_FILE_NAME = ".env"
+
+# The only Groq model that accepts images. Other Groq models are text-only.
+GROQ_VISION_MODEL = "qwen/qwen3.8-27b"
+
+# Hardcoded defaults — used when the user config omits a key and no env var is set.
 _DEFAULTS = {
     "PROVIDER": "groq",
     "GROQ_API_KEY": "",
-    "MODEL": "qwen/qwen3.6-27b",
+    "MODEL": GROQ_VISION_MODEL,
     "OLLAMA_HOST": "http://localhost:11434/v1",
     "OLLAMA_MODEL": "llava:latest",
     "OPENAI_API_BASE": "",
@@ -43,14 +60,30 @@ _DEFAULTS = {
     "REASONING_EFFORT": "none",
 }
 
-# Module-level cache; populated on first get_config() call
+# Exported process environment variables that override the config file.
+# GROQ_MODEL overrides MODEL; the other names match their config keys.
+_ENV_OVERRIDES = (
+    ("GROQ_API_KEY", "GROQ_API_KEY"),
+    ("GROQ_MODEL", "MODEL"),
+    ("OPENAI_API_KEY", "OPENAI_API_KEY"),
+)
+
+# Module-level cache; populated on the first get_config() call.
 _config = None
 
-# Template written when no config.ini is found
-_TEMPLATE = """# AI Image Renamer — Configuration
+# Template written when the user config file does not exist yet.
+_TEMPLATE = """# AI Image Renamer configuration
 #
-# This file sets defaults for rename_images commands.
-# CLI arguments (e.g. -w) always override these defaults.
+# This file stores the model, word count, and other defaults.
+# Edit it in place. pip and pipx reinstalls do not replace it.
+#
+# Priority: command-line flags, then exported environment variables,
+# then this file, then built-in defaults.
+#
+# A shell profile must export a variable for this program to see it.
+# `GROQ_API_KEY=...` in .zshrc is visible to `echo` but is not inherited.
+# Use `export GROQ_API_KEY="your-key-here"`. An exported value overrides
+# the same key below.
 
 # Which AI backend to use: groq, ollama, or openai
 # - groq:   hosted Groq API (requires GROQ_API_KEY)
@@ -62,9 +95,9 @@ PROVIDER=groq
 # Get a free key at: https://console.groq.com/keys
 GROQ_API_KEY=
 
-# The Groq model to use for image analysis
-# Browse available models: https://console.groq.com/docs/models
-MODEL=qwen/qwen3.6-27b
+# Groq model. Only qwen/qwen3.8-27b accepts images.
+# https://console.groq.com/docs/model/qwen/qwen3.8-27b
+MODEL=qwen/qwen3.8-27b
 
 # Ollama server (OpenAI-compatible endpoint, required for PROVIDER=ollama)
 # Start it with: ollama serve
@@ -106,72 +139,132 @@ REASONING_EFFORT=none
 """
 
 
-def _get_config_path():
-    """Return the path to config.ini in the current working directory."""
-    return os.path.join(os.getcwd(), "config.ini")
+def config_dir():
+    """Return the user config directory, creating nothing.
 
-
-def _generate_config():
-    """Create a commented config.ini in the CWD if none exists.
-
-    Prints a message to stderr so the user knows the file was created.
+    ``$XDG_CONFIG_HOME/ai-image-renamer-cli`` when that variable is set,
+    otherwise ``~/.config/ai-image-renamer-cli``.
     """
-    path = _get_config_path()
-    if os.path.exists(path):
-        return
+    xdg = os.environ.get("XDG_CONFIG_HOME", "").strip()
+    if xdg:
+        base = xdg
+    else:
+        base = os.path.join(os.path.expanduser("~"), ".config")
+    return os.path.join(base, _APP_DIR_NAME)
 
+
+def config_path():
+    """Return the path to the editable user config file."""
+    return os.path.join(config_dir(), _CONFIG_FILE_NAME)
+
+
+def clear_cache():
+    """Drop the cached settings so the next read uses the filesystem."""
+    global _config
+    _config = None
+
+
+def ensure_config_file():
+    """Create the user config directory and template file when missing.
+
+    The directory is mode ``0700`` and the file is mode ``0600``.
+    An existing file is left unchanged.
+    """
+    directory = config_dir()
+    path = config_path()
     try:
-        with open(path, "w", encoding="utf-8") as fh:
-            fh.write(_TEMPLATE)
-        print(f"Created default config at {path}", file=sys.stderr)
+        os.makedirs(directory, exist_ok=True)
+        os.chmod(directory, 0o700)
     except OSError as exc:
-        print(f"Warning: could not create config.ini at {path}: {exc}", file=sys.stderr)
+        print(f"Warning: could not create config directory at {directory}: {exc}", file=sys.stderr)
+        return path
+
+    if os.path.isfile(path):
+        return path
+
+    temporary = path + ".tmp"
+    try:
+        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(_TEMPLATE)
+        os.chmod(temporary, 0o600)
+        os.replace(temporary, path)
+    except OSError as exc:
+        print(f"Warning: could not create config at {path}: {exc}", file=sys.stderr)
+        return path
+
+    print(f"Created default config at {path}", file=sys.stderr)
+    return path
+
+
+def load_environment():
+    """Load the user config file without replacing existing variables.
+
+    Exported variables such as ``GROQ_API_KEY`` stay as they are. Keys that
+    are missing from the process environment are filled from the config file.
+    Returns the config path.
+    """
+    path = ensure_config_file()
+    from dotenv import load_dotenv
+
+    # override=False is required. The generated file contains GROQ_API_KEY=
+    # and must not wipe a key already exported by the shell.
+    load_dotenv(dotenv_path=path, override=False)
+    return path
 
 
 def _parse_config_file(path):
-    """Parse a key=value config.ini file and return a dict.
+    """Parse the user config file and return a dict of string values.
 
-    Lines starting with # are treated as comments.
-    Lines starting with [ are treated as section headers (ignored).
-    Blank lines are ignored.
-    Keys and values are stripped of surrounding whitespace.
+    Blank lines and ``#`` comments are ignored. ``export KEY=value`` and
+    surrounding quotes are accepted, matching ``.env`` syntax.
     """
-    config = {}
     if not os.path.isfile(path):
-        return config
+        return {}
 
-    with open(path, encoding="utf-8") as fh:
-        for line in fh:
-            line = line.strip()
-            if not line or line.startswith("#") or line.startswith("["):
-                continue
-            if "=" in line:
-                key, value = line.split("=", 1)
-                config[key.strip()] = value.strip()
+    from dotenv import dotenv_values
 
+    try:
+        parsed = dotenv_values(path)
+    except OSError as exc:
+        print(f"Warning: could not read config at {path}: {exc}", file=sys.stderr)
+        return {}
+
+    config = {}
+    for key, value in parsed.items():
+        if not key:
+            continue
+        config[key] = "" if value is None else value
     return config
 
 
-def get_config():
-    """Load config.ini from CWD and return a merged dict.
+def _overlay_environment(merged):
+    """Let exported environment variables replace file values."""
+    for env_name, key in _ENV_OVERRIDES:
+        value = (os.environ.get(env_name) or "").strip()
+        if value:
+            merged[key] = value
 
-    Auto-generates a commented config.ini on first call if none exists.
-    The result is cached so subsequent calls return the same dict.
+
+def get_config():
+    """Load the user config file and return the merged settings.
+
+    The file is created on first call when it is missing. The result is
+    cached. Call ``clear_cache()`` after changing the file or the process
+    environment in the same process.
     """
     global _config
     if _config is not None:
         return _config
 
-    # Auto-generate config.ini if missing
-    _generate_config()
-
-    _config = dict(_DEFAULTS)
-    file_cfg = _parse_config_file(_get_config_path())
-    _config.update(file_cfg)
-
+    path = ensure_config_file()
+    merged = dict(_DEFAULTS)
+    merged.update(_parse_config_file(path))
+    _overlay_environment(merged)
+    _config = merged
     return _config
 
 
 def get(key, default=None):
-    """Return a config value by key, falling back to default."""
+    """Return a config value by key, falling back to ``default``."""
     return get_config().get(key, default)

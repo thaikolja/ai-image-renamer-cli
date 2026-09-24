@@ -17,13 +17,13 @@ The default provider. Images are sent to Groq's hosted multimodal API, processed
 ```bash
 # 1. Get a free API key at https://console.groq.com/keys
 
-# 2. Configure it (config.ini in your working directory)
+# 2. Configure it in ~/.config/ai-image-renamer-cli/.env
 ```
 
 ```ini
 PROVIDER=groq
 GROQ_API_KEY=gsk_your_api_key_here
-MODEL=qwen/qwen3.6-27b
+MODEL=qwen/qwen3.8-27b
 ```
 
 Or via environment variable:
@@ -32,13 +32,9 @@ Or via environment variable:
 export GROQ_API_KEY="your-key-here"
 ```
 
-### Available models
+### Vision model
 
-Browse the [Groq model catalog](https://console.groq.com/docs/models) for vision-capable models. Common choices:
-
-- `qwen/qwen3.6-27b` — default, strong vision + reasoning
-- `meta-llama/llama-4-scout-17b-16e-instruct` — fast and lightweight
-- `openai/gpt-oss-20b` — good balance of speed and quality
+On Groq, only [`qwen/qwen3.8-27b`](https://console.groq.com/docs/model/qwen/qwen3.8-27b) accepts images. Other Groq models are text-only and cannot describe a picture. Keep `MODEL` set to that id.
 
 ### Limits
 
@@ -47,7 +43,7 @@ Groq's hosted API has practical limits:
 - Images must be **under 20 MB**
 - Resolution should stay **under 33 megapixels** (resize high-res photos first)
 - Base64-encoded data must stay **under 4 MB**
-- Up to 5 images per API request (the CLI caps at 3)
+- Up to 3 images per request (the CLI sends at most 3)
 
 ## Ollama
 
@@ -149,7 +145,7 @@ Any provider's model can be overridden at runtime:
 
 ```bash
 # Groq model override
-rename_images --model qwen/qwen3.6-27b photo.jpg
+rename_images --model qwen/qwen3.8-27b photo.jpg
 
 # Ollama model override
 rename_images --provider ollama --model minicpm-v photo.jpg

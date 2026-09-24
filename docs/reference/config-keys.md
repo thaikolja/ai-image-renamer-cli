@@ -1,12 +1,12 @@
 # Config Keys Reference
 
-Every key understood by `config.ini`, with defaults and purposes.
+Every key understood by `~/.config/ai-image-renamer-cli/.env`, with defaults and purposes.
 
 | Key | Default | Purpose |
 |-----|---------|---------|
 | `PROVIDER` | `groq` | AI backend: `groq`, `ollama`, or `openai` |
 | `GROQ_API_KEY` | *(empty)* | Groq API key (required for the `groq` provider) |
-| `MODEL` | `qwen/qwen3.6-27b` | Groq vision model |
+| `MODEL` | `qwen/qwen3.8-27b` | Groq model. Only this model accepts images |
 | `OLLAMA_HOST` | `http://localhost:11434/v1` | Ollama OpenAI-compatible endpoint |
 | `OLLAMA_MODEL` | `llava:latest` | Ollama vision model |
 | `OPENAI_API_BASE` | *(empty)* | OpenAI-compatible endpoint (required for the `openai` provider) |
@@ -40,7 +40,7 @@ Which config key is used depends on the active provider:
 ## Override order
 
 ```
-CLI flag  >  environment variable  >  config.ini  >  hardcoded default
+CLI flag  >  exported environment variable  >  user config file  >  hardcoded default
 ```
 
 ## Invalid values

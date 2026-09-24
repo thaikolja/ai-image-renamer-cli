@@ -240,18 +240,18 @@ def get_words(
     - "openai": any OpenAI-compatible endpoint (LM Studio, vLLM, llama.cpp, ...)
 
     The provider, model, temperature, timeout, and retry count are read from
-    config.ini (with hardcoded fallbacks). Includes automatic retry with
-    exponential backoff for transient failures.
+    the user config file (with hardcoded fallbacks). Includes automatic retry
+    with exponential backoff for transient failures.
 
     Args:
         image_path: Filesystem path to the image to analyze.
         words: Maximum number of words requested in the description (1-50).
         model: Optional CLI override for the model (takes priority over
-               config.ini and hardcoded default).
+               the user config file and the hardcoded default).
         api_key: Optional CLI override for the API key (takes priority
-                 over environment variable and config.ini).
+                 over an exported environment variable and the user config).
         provider: Optional CLI override for the provider ("groq", "ollama",
-                  or "openai"). Takes priority over config.ini.
+                  or "openai"). Takes priority over the user config file.
 
     Returns:
         AI-generated description, or empty string on failure after retries.
@@ -262,7 +262,7 @@ def get_words(
         FileNotFoundError: If image_path does not exist.
 
     """
-    # Provider priority: CLI param → config.ini
+    # Provider priority: CLI param → user config
     provider = provider or config.get("PROVIDER", "groq")
 
     # Dispatch to the provider-specific implementation
@@ -280,14 +280,19 @@ def _get_words_groq(
     api_key: Optional[str],
 ) -> str:
     """Send the image to the Groq API and return an AI description."""
-    # API key priority: CLI param → env var → config.ini
-    groq_api_key = api_key or os.getenv("GROQ_API_KEY") or config.get("GROQ_API_KEY")
+    # API key priority: CLI param → exported env var → user config.
+    # os.getenv only sees exported variables. An unexported .zshrc assignment
+    # is visible to `echo` and is still missing here.
+    groq_api_key = (api_key or os.getenv("GROQ_API_KEY") or config.get("GROQ_API_KEY") or "").strip()
     # Check if the API key is set
     if not groq_api_key:
         # Raise a RuntimeError with setup instructions for the API key
         raise RuntimeError(
             "GROQ_API_KEY is not set. "
-            "Pass --api-key, or export GROQ_API_KEY, or set it in ./config.ini. "
+            "Pass --api-key, export GROQ_API_KEY, or set it in "
+            f"{config.config_path()}. "
+            "An assignment in .zshrc without export is visible to echo "
+            "but is not passed to this program. "
             "Get a free key at: https://console.groq.com/keys"
         )
 
@@ -297,8 +302,14 @@ def _get_words_groq(
     # Build the shared multimodal request messages
     request_messages = _build_request_messages(image_path, words)
 
-    # Model priority: CLI param → GROQ_MODEL env var → config.ini
-    effective_model = model or os.getenv("GROQ_MODEL") or config.get("MODEL")
+    # Model priority: CLI param → GROQ_MODEL env var → user config
+    effective_model = model or os.getenv("GROQ_MODEL") or config.get("MODEL") or config.GROQ_VISION_MODEL
+    if effective_model != config.GROQ_VISION_MODEL:
+        print(
+            f"Warning: Groq model '{effective_model}' does not accept images. "
+            f"Only {config.GROQ_VISION_MODEL} has vision support.",
+            file=sys.stderr,
+        )
 
     # Only include reasoning_effort for reasoning models (Qwen, GPT-OSS)
     reasoning_effort: Optional[str] = config.get("REASONING_EFFORT")
@@ -350,11 +361,11 @@ def _get_words_openai_compatible(
     if not base_url:
         raise RuntimeError(
             "OPENAI_API_BASE is not set. "
-            "Set OPENAI_API_BASE in ./config.ini (e.g. "
+            f"Set OPENAI_API_BASE in {config.config_path()} (e.g. "
             "OPENAI_API_BASE=http://localhost:1234/v1 for LM Studio)."
         )
     if not effective_model:
-        raise RuntimeError("OPENAI_MODEL is not set. Pass --model, or set OPENAI_MODEL in ./config.ini.")
+        raise RuntimeError(f"OPENAI_MODEL is not set. Pass --model, or set OPENAI_MODEL in {config.config_path()}.")
 
     # Import the OpenAI client (lazy import; requires the [local] extra)
     try:
@@ -417,39 +428,39 @@ def _build_request_messages(image_path: str, words: int) -> list:
 
 
 def _parse_temperature() -> float:
-    """Parse TEMPERATURE from config.ini, falling back to 1.0."""
+    """Parse TEMPERATURE from the user config, falling back to 1.0."""
     _temp_raw = config.get("TEMPERATURE", "1.0")
     try:
         return float(_temp_raw)
     except (ValueError, TypeError):
         print(
-            f"Invalid TEMPERATURE '{_temp_raw}' in config.ini. Using 1.0.",
+            f"Invalid TEMPERATURE '{_temp_raw}' in {config.config_path()}. Using 1.0.",
             file=sys.stderr,
         )
         return 1.0
 
 
 def _parse_timeout() -> float:
-    """Parse TIMEOUT from config.ini, falling back to the module default."""
+    """Parse TIMEOUT from the user config, falling back to the module default."""
     _timeout_raw = config.get("TIMEOUT", str(_REQUEST_TIMEOUT))
     try:
         return float(_timeout_raw)
     except (ValueError, TypeError):
         print(
-            f"Invalid TIMEOUT '{_timeout_raw}' in config.ini. Using {_REQUEST_TIMEOUT}.",
+            f"Invalid TIMEOUT '{_timeout_raw}' in {config.config_path()}. Using {_REQUEST_TIMEOUT}.",
             file=sys.stderr,
         )
         return _REQUEST_TIMEOUT
 
 
 def _parse_retries() -> int:
-    """Parse MAX_RETRIES from config.ini, falling back to the module default."""
+    """Parse MAX_RETRIES from the user config, falling back to the module default."""
     _retries_raw = config.get("MAX_RETRIES", str(_RETRY_MAX))
     try:
         return int(_retries_raw)
     except (ValueError, TypeError):
         print(
-            f"Invalid MAX_RETRIES '{_retries_raw}' in config.ini. Using {_RETRY_MAX}.",
+            f"Invalid MAX_RETRIES '{_retries_raw}' in {config.config_path()}. Using {_RETRY_MAX}.",
             file=sys.stderr,
         )
         return _RETRY_MAX

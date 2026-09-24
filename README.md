@@ -73,14 +73,23 @@ pip install .
 python3 -m ai_image_renamer.cli path/to/image.jpg
 ```
 
-After installation, obtain a free Groq API key. The recommended way to configure the tool is via a `config.ini` file in your working directory. On first run, a commented `config.ini` is auto-generated — just edit it to set your API key:
+After installation, obtain a free Groq API key and edit the config file. The file is created on the first run and is kept when you reinstall with pip or pipx:
 
-```ini
-# Edit the generated config.ini
-GROQ_API_KEY=gsk_your_api_key_here
+```text
+~/.config/ai-image-renamer-cli/.env
 ```
 
-Alternatively, set it as an environment variable:
+If `XDG_CONFIG_HOME` is set, the file is `$XDG_CONFIG_HOME/ai-image-renamer-cli/.env` instead. The file stays in your home config directory, so a pip or pipx reinstall leaves your key and settings in place.
+
+```bash
+# ~/.config/ai-image-renamer-cli/.env
+GROQ_API_KEY=gsk_your_api_key_here
+MODEL=qwen/qwen3.8-27b
+```
+
+On Groq, only `qwen/qwen3.8-27b` accepts images. Every other Groq model is text-only, so it cannot rename a picture. Leave `MODEL` set to `qwen/qwen3.8-27b`. If a config file already exists from an older version, change `MODEL` there. The program does not overwrite an existing file. Local Ollama and OpenAI-compatible servers use their own vision models (`OLLAMA_MODEL` and `OPENAI_MODEL`).
+
+An exported environment variable overrides the file. The variable has to be exported. A bare assignment in `.zshrc` shows up in `echo` and is not passed to the program:
 
 ```bash
 export GROQ_API_KEY="your-key-here"
@@ -88,7 +97,7 @@ export GROQ_API_KEY="your-key-here"
 
 ## Providers
 
-The tool supports three AI backends, selected via `PROVIDER` in `config.ini` or the `--provider` CLI flag.
+The tool supports three AI backends, selected via `PROVIDER` in the user config file or the `--provider` CLI flag.
 
 ### Groq (default)
 
@@ -97,7 +106,10 @@ Hosted and fast. Requires a [free API key](https://console.groq.com/keys):
 ```ini
 PROVIDER=groq
 GROQ_API_KEY=gsk_your_api_key_here
+MODEL=qwen/qwen3.8-27b
 ```
+
+Only `qwen/qwen3.8-27b` has vision on Groq. Point `MODEL` at that id.
 
 ### Ollama (local)
 
@@ -132,7 +144,7 @@ See the [documentation](https://docs.kolja-nolte.com/ai-image-renamer-cli/guide/
 
 ## Usage
 
-The `rename_images` command is your entry point to the tool. The AI model, word count, and other options are configurable via CLI flags or `config.ini`. Some limitations apply:
+The `rename_images` command is your entry point to the tool. The AI model, word count, and other options are configurable via CLI flags or the user config file. Some limitations apply:
 
 ### Basic Usage
 
@@ -171,7 +183,7 @@ Override the API key, provider, or model for a single invocation:
 
 ```bash
 # Override API key and model via CLI
-rename_images --api-key gsk_xxx --model qwen/qwen3.6-27b
+rename_images --api-key gsk_xxx --model qwen/qwen3.8-27b
 
 # Use a local Ollama model
 rename_images --provider ollama photo.jpg
@@ -191,13 +203,13 @@ See `rename_images -h` for more options, or read the [documentation](https://doc
 
 ### Configuration
 
-The tool reads settings from `./config.ini` in the current working directory. If the file doesn't exist, it is auto-generated with comments explaining every option:
+The tool reads settings from `~/.config/ai-image-renamer-cli/.env`. If the file doesn't exist, it is auto-generated with comments explaining every option:
 
 ```ini
 # AI Image Renamer — Configuration
 PROVIDER=groq                          # AI backend: groq, ollama, or openai
 GROQ_API_KEY=                          # Your Groq API key (required for groq)
-MODEL=qwen/qwen3.6-27b                 # Groq AI vision model (vision required)
+MODEL=qwen/qwen3.8-27b                 # Only Groq model that accepts images
 OLLAMA_HOST=http://localhost:11434/v1  # Ollama endpoint (for ollama)
 OLLAMA_MODEL=llava:latest              # Ollama vision model (for ollama)
 OPENAI_API_BASE=                       # OpenAI-compatible endpoint (for openai)
@@ -214,13 +226,13 @@ MAX_FILENAME_LENGTH=100                # Max filename stem length (characters)
 >
 > CLI arguments (e.g. `-w`) always override the config file values.
 >
-> **Priority:** CLI flags → environment variables → `config.ini` → built-in defaults.
+> **Priority:** CLI flags → exported environment variables → `~/.config/ai-image-renamer-cli/.env` → built-in defaults.
 
 ### Security
 
 > [!WARNING]
 >
-> **Security:** Add `config.ini` to your `.gitignore` to avoid committing your API key.
+> **Security:** The config file is stored outside the project and is created with mode `0600`. Do not commit a copy of it. A working-directory `config.ini` is not read.
 
 ### Limitations
 
@@ -229,9 +241,9 @@ The hosted Groq provider has the following practical limits to keep in mind (loc
 - **Image file size**: Each image must be **under 20 MB** (files larger than that will be rejected by the API).
 - **Image resolution**: Very high-resolution photos (over 33 megapixels, e.g., some DSLR or smartphone camera shots) may need to be resized first.
 - **Base64 limit**: When sending images via API, the base64-encoded data must stay under 4 MB.
-- **Images per request**: The model accepts **up to 5 images at once** (the CLI caps this at 3 to stay well within bounds).
-- **Model**: The model can be changed via `--model` CLI flag, `GROQ_MODEL` environment variable, or `MODEL` in `config.ini`. Browse available models at [console.groq.com/docs/models](https://console.groq.com/docs/models).
-- **Model Reasoning**: Reasoning models (Qwen, GPT-OSS) output internal thinking by default. Set `REASONING_EFFORT=none` in `config.ini` to suppress it. See [Groq reasoning docs](https://console.groq.com/docs/reasoning) for details.
+- **Images per request**: `qwen/qwen3.8-27b` accepts **up to 3 images** at once, which is also the CLI cap.
+- **Model**: On Groq, only `qwen/qwen3.8-27b` accepts images. Set it with `MODEL` in `~/.config/ai-image-renamer-cli/.env`, `GROQ_MODEL`, or `--model`. See the [model page](https://console.groq.com/docs/model/qwen/qwen3.8-27b).
+- **Model Reasoning**: Reasoning models (Qwen, GPT-OSS) output internal thinking by default. Set `REASONING_EFFORT=none` in the user config file to suppress it. See [Groq reasoning docs](https://console.groq.com/docs/reasoning) for details.
 
 ### Local LLM requirements
 

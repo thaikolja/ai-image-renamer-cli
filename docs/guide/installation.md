@@ -106,5 +106,5 @@ rename_images --version
 You should see:
 
 ```
-rename_images 1.4.0
+rename_images 1.5.0
 ```

@@ -63,7 +63,7 @@ pip install ai-image-renamer
 rename_images photo.jpg
 ```
 
-That's it. The first run auto-generates a commented `config.ini` — just add your API key (or configure a local provider) and go.
+That's it. The first run auto-generates a commented config file at `~/.config/ai-image-renamer-cli/.env` — just add your API key (or configure a local provider) and go.
 
 ::: tip
 Prefer full privacy? Point the tool at a local [Ollama](/guide/providers#ollama) server and keep your images on your machine.

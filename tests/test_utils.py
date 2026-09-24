@@ -36,9 +36,14 @@ except ImportError:
     # Import utils again after adjusting the path
     from ai_image_renamer import utils
 
+try:
+    from tests.base import IsolatedTestCase
+except ImportError:
+    from base import IsolatedTestCase
+
 
 # Define the test class for utility functions
-class TestUtils(unittest.TestCase):
+class TestUtils(IsolatedTestCase):
     """
     Unit tests for utility functions in the ai_image_renamer.utils module.
 
@@ -130,7 +135,7 @@ class TestUtils(unittest.TestCase):
         # Provide a fake API key and model via config mock
         mock_config_get.side_effect = lambda key, default=None: {
             "GROQ_API_KEY": "test-api-key",
-            "MODEL": "qwen/qwen3.6-27b",
+            "MODEL": "qwen/qwen3.8-27b",
         }.get(key, default)
         # Create a mock completion object
         mock_completion = MagicMock()
@@ -145,7 +150,7 @@ class TestUtils(unittest.TestCase):
         # Capture the kwargs passed to the Groq API create call
         create_kwargs = mock_groq.return_value.chat.completions.create.call_args.kwargs
         # Assert that the correct model name was used
-        self.assertEqual(create_kwargs["model"], "qwen/qwen3.6-27b")
+        self.assertEqual(create_kwargs["model"], "qwen/qwen3.8-27b")
         # Assert that the vision URL includes the correct MIME type and encoded image
         self.assertEqual(
             create_kwargs["messages"][0]["content"][1]["image_url"]["url"],
@@ -229,9 +234,91 @@ class TestUtils(unittest.TestCase):
         # Configure the mock to return None (no API key found)
         mock_getenv.return_value = None
         # Assert that calling get_words without an API key raises RuntimeError
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(RuntimeError) as caught:
             # Call get_words which should raise due to missing API key
             utils.get_words("test_image.jpg", words=6)
+        message = str(caught.exception)
+        self.assertIn('ai-image-renamer-cli', message)
+        self.assertIn('.env', message)
+        self.assertIn('export', message)
+
+    @patch('ai_image_renamer.utils.encode_image')
+    @patch('filetype.guess')
+    @patch('groq.Groq')
+    @patch('ai_image_renamer.utils.config.get')
+    def test_get_words_prefers_exported_api_key_over_config(
+        self, mock_config_get, mock_groq, mock_guess, mock_encode_image
+    ):
+        """An exported GROQ_API_KEY wins over a different key in the config file."""
+        mock_encode_image.return_value = 'encoded_image_string'
+        mock_guess.return_value = MagicMock(mime='image/png')
+        mock_config_get.side_effect = lambda key, default=None: {
+            'GROQ_API_KEY': 'from-file',
+            'MODEL': 'qwen/qwen3.8-27b',
+        }.get(key, default)
+        mock_completion = MagicMock()
+        mock_completion.choices[0].message.content = 'red barn'
+        mock_groq.return_value.chat.completions.create.return_value = mock_completion
+
+        with patch.dict(os.environ, {'GROQ_API_KEY': 'from-env'}):
+            result = utils.get_words('test_image.jpg', words=2)
+
+        self.assertEqual(result, 'red barn')
+        self.assertEqual(mock_groq.call_args.kwargs['api_key'], 'from-env')
+
+    @patch('ai_image_renamer.utils.encode_image')
+    @patch('filetype.guess')
+    @patch('groq.Groq')
+    @patch('ai_image_renamer.utils.config.get')
+    def test_get_words_uses_config_api_key_when_env_missing(
+        self, mock_config_get, mock_groq, mock_guess, mock_encode_image
+    ):
+        """The user config key is used when the process environment has none."""
+        mock_encode_image.return_value = 'encoded_image_string'
+        mock_guess.return_value = MagicMock(mime='image/png')
+        mock_config_get.side_effect = lambda key, default=None: {
+            'GROQ_API_KEY': 'from-file',
+            'MODEL': 'qwen/qwen3.8-27b',
+        }.get(key, default)
+        mock_completion = MagicMock()
+        mock_completion.choices[0].message.content = 'red barn'
+        mock_groq.return_value.chat.completions.create.return_value = mock_completion
+
+        os.environ.pop('GROQ_API_KEY', None)
+        result = utils.get_words('test_image.jpg', words=2)
+
+        self.assertEqual(result, 'red barn')
+        self.assertEqual(mock_groq.call_args.kwargs['api_key'], 'from-file')
+
+    @patch('ai_image_renamer.utils.encode_image')
+    @patch('filetype.guess')
+    @patch('groq.Groq')
+    @patch('ai_image_renamer.utils.config.get')
+    def test_get_words_warns_when_groq_model_has_no_vision(
+        self, mock_config_get, mock_groq, mock_guess, mock_encode_image
+    ):
+        """A Groq model other than qwen/qwen3.8-27b is reported as text-only."""
+        mock_encode_image.return_value = 'encoded_image_string'
+        mock_guess.return_value = MagicMock(mime='image/png')
+        mock_config_get.side_effect = lambda key, default=None: {
+            'GROQ_API_KEY': 'from-file',
+            'MODEL': 'openai/gpt-oss-20b',
+        }.get(key, default)
+        mock_completion = MagicMock()
+        mock_completion.choices[0].message.content = 'red barn'
+        mock_groq.return_value.chat.completions.create.return_value = mock_completion
+
+        with patch('sys.stderr') as stderr:
+            result = utils.get_words('test_image.jpg', words=2)
+
+        self.assertEqual(result, 'red barn')
+        warning = ''.join(call.args[0] for call in stderr.write.call_args_list if call.args)
+        self.assertIn('does not accept images', warning)
+        self.assertIn('qwen/qwen3.8-27b', warning)
+        self.assertEqual(
+            mock_groq.return_value.chat.completions.create.call_args.kwargs['model'],
+            'openai/gpt-oss-20b',
+        )
 
     # Mock encode_image to return a fixed encoded string
     @patch('ai_image_renamer.utils.encode_image')

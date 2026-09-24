@@ -19,9 +19,14 @@ except ImportError:
     # Import the renamer module from the development path
     from ai_image_renamer import renamer
 
+try:
+    from tests.base import IsolatedTestCase
+except ImportError:
+    from base import IsolatedTestCase
+
 
 # Define the test class for the ImageRenamer rename pipeline
-class TestRenamer(unittest.TestCase):
+class TestRenamer(IsolatedTestCase):
     """Unit tests for the ImageRenamer class.
 
     These tests verify the renaming pipeline:

@@ -7,10 +7,6 @@ Icon
 !README.md
 !CHANGELOG.md
 !CONTRIBUTING.md
-!docs/**/*.md
-docs/node_modules/
-docs/.vitepress/dist/
-docs/.vitepress/cache/
 ._*
 .DocumentRevisions-V100
 .fseventsd
@@ -72,7 +68,9 @@ db.sqlite3-journal
 instance/
 .webassets-cache
 .scrapy
-docs/_build/
+# In-repo docs site and local agent state are not part of this repository
+docs/
+.serena/
 .pybuilder/
 target/
 .ipynb_checkpoints
@@ -109,4 +107,3 @@ NOTES.md
 
 # User config (contains API keys — keep local)
 config.ini
-

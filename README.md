@@ -73,7 +73,7 @@ pip install .
 python3 -m ai_image_renamer.cli path/to/image.jpg
 ```
 
-After installation, obtain a free Groq API key and edit the config file. The file is created on the first run and is kept when you reinstall with pip or pipx:
+After installation, obtain a free Groq API key and edit the config file. `.env.example` in this repository is the template. Copy it to the path below, or let the first run create the file. Reinstalling with pip or pipx leaves that copy in place:
 
 ```text
 ~/.config/ai-image-renamer-cli/.env
@@ -140,7 +140,7 @@ OPENAI_API_BASE=http://localhost:1234/v1
 OPENAI_MODEL=my-vision-model
 ```
 
-See the [documentation](https://docs.kolja-nolte.com/ai-image-renamer-cli/guide/providers) for full provider setup and troubleshooting.
+See the [documentation](https://docs.kolja-nolte.com/ai-image-renamer-cli/usage/providers) for full provider setup and troubleshooting.
 
 ## Usage
 

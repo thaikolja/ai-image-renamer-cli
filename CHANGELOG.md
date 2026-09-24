@@ -21,6 +21,11 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - **readme:** document the config-file path and that only `qwen/qwen3.8-27b` accepts images on Groq
 
+### chore
+
+- **repo:** add `.env.example` for `~/.config/ai-image-renamer-cli/.env`
+- **repo:** remove the in-repo `docs/` site and `.serena/` from the GitLab tree
+
 ## 1.4.0
 
 ### feat
